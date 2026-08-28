@@ -4,18 +4,30 @@
 1. `STATUS.md` — where the system is right now (the 60-second orient)
 2. `DEVLOG.md` — the top entry (what changed last)
 3. `DEVPLAN.md` — the current `[ ACTIVE ]` stage
-4. `MODEL.md` — the design bible (amended in place; currently INCOMPLETE)
-
-## Hard rule while DEVPLAN Stage 0 is `[ ACTIVE ]`
-**Do not implement the model.** Stage 0 is a design conversation Chris wants to have
-before any code is written. The open decisions are enumerated in DEVPLAN §0.1–0.5; several
-of them (lattice vs. continuous heading, one resource pool vs. two, finite vs. infinite
-water) change the architecture, so building first would mean building the wrong thing.
-When a decision is made, amend `MODEL.md` in place and rewrite the DEVPLAN stage before
-touching `src/`.
+4. `MODEL.md` — the design bible (amended in place). **Read it before touching `src/`.**
 
 ## What this is
-A 2D cellular-automaton plant-growth model: L-system-style genomes read by active growth tips, layered on a soil-moisture + light resource CA.
+A 2D cellular-automaton plant-growth model: genomes are instruction tapes read by concurrent
+growth tips, layered on a soil-moisture + light resource CA. The goal is **evolved
+diversity** — distinct coexisting growth forms, niches arising from the dynamics rather than
+assumed. Stage 0 (the model design) is `[ DONE ]`; building has begun.
+
+## Model rules that are decisions, not details
+Changing any of these changes the results. If one looks wrong, raise it — don't quietly
+"fix" it. Rationale for each is in `MODEL.md`.
+- **This is not an L-system.** Tape + read head + program counter per tip; development *is*
+  execution. `B` is a concurrent fork, not a bracket. There is no stack.
+- **The language is permissive; the economy is what constrains.** Bloat, plant size,
+  branching ratio, seed number — every limit goes in the resource economy, never the grammar.
+- **No lethal sites.** No symbol may, by single-point appearance, kill the organism. This is
+  why there is no end-of-tip symbol, and why `*` must never be "repaired" by truncating
+  after it.
+- **Tips draw from the local cell's pool, never a shared plant pool.** This forecloses the
+  proliferate-meristems exploit and is what makes self-pruning work.
+- **Light is graded, not binary.** A binary shadow deletes the understory niche and with it
+  any chance of stratification.
+- **Store trait vectors, never a diversity scalar.** The measure will change; runs are
+  expensive.
 
 ## Stack (never violate)
 - Vanilla JS + Canvas. No build step, no framework, no modules. `<script>` tags load
