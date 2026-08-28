@@ -12,7 +12,7 @@ Stage 3 closed with storage built (it did not fix the overshoot — see MODEL.md
 ## State
 **Stages 1-4 run, in-browser and headless — `smoketest.mjs` 33/33 PASS @ 2026-08-28.**
 Browser demo sows the founder `GL@@@@@@!GLF*`; ~15 s of watching gives 57 plants, 119 born,
-70 died, 48 seeds banked.
+70 died, 48 seeds banked. Tick cost 0.57 ms at 141 plant cells, 1.43 ms at 1922.
 
 *Environment:* heterogeneous terrain; two water sources (table + episodic rain); field
 capacity; moisture-dependent conductivity; wilting-point uptake; graded light.

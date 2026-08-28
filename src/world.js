@@ -64,6 +64,7 @@ var World = class World {
     this.births = 0;           // germinations
     this.clonalSplits = 0;     // fragments that became independent plants
     this.plantDeaths = 0;
+    this.pcells = [];          // indices of all living plant cells, rebuilt once per tick
     this.plants = [];
     this.nextPlantId = 0;
     this.rng = makeRNG(PARAMETERS.seed);
@@ -231,6 +232,7 @@ var World = class World {
     this.evaporate();
     this.computeLight();
     // physiology BEFORE development: a tip decides using this tick's supply
+    this.collectPlantCells();
     this.photosynthesise();
     this.transport();
     this.maintain();
@@ -382,13 +384,23 @@ var World = class World {
 
   // --- plant physiology ---------------------------------------------------
 
+  // One list of living plant cells per tick. The physiology passes used to scan the whole
+  // 30k-cell grid — transport did it 6 sub-steps x 2 fields = 360k visits per tick to move
+  // sugar between ~1k cells, which cost 1.68 ms/tick at 141 cells against 0.27 ms for the
+  // bare environment.
+  collectPlantCells() {
+    const out = [];
+    for (const pl of this.plants) for (const i of pl.cells) if (this.type[i] >= CELL.ROOT) out.push(i);
+    this.pcells = out;
+  }
+
   // Leaves fix carbon and lose water doing it. Photosynthesis REQUIRES water: stomata must
   // open to admit CO2, and that is what the water is spent on. A leaf with no water makes no
   // sugar, so drought costs carbon directly rather than merely slowing growth.
   photosynthesise() {
     const P = PARAMETERS, L = this.light, pw = this.pw, ps = this.ps, t = this.type;
-    this.made.fill(0);
-    for (let i = 0; i < this.n; i++) {
+    for (const i of this.pcells) this.made[i] = 0;
+    for (const i of this.pcells) {
       if (t[i] !== CELL.LEAF) continue;
       const lit = L[i];
       if (lit <= 0) continue;
@@ -403,33 +415,30 @@ var World = class World {
   // sugar descends from leaves purely by gradient — no directional pump. Tall plants are
   // penalised by transport lag; treated as a feature until evidence says otherwise.
   transport() {
-    const W = this.W, H = this.H, r = PARAMETERS.transportRate;
+    const W = this.W, r = PARAMETERS.transportRate;
     const t = this.type, own = this.owner;
     const iters = PARAMETERS.transportIters | 0;
     const rel = PARAMETERS.storeRelease;
-    for (const field of [this.pw, this.ps])
-     for (let it = 0; it < iters; it++) {
-      const nx = this.pbuf;
-      nx.set(field);
-      for (let y = 0; y < H; y++) {
-        for (let x = 0; x < W; x++) {
-          const i = y * W + x;
-          if (t[i] < CELL.ROOT) continue;
-          const o = own[i];
+    const pc = this.pcells, nx = this.pbuf;
+    if (!pc.length) return;
+    for (const field of [this.pw, this.ps]) {
+      for (let it = 0; it < iters; it++) {
+        for (let k = 0; k < pc.length; k++) nx[pc[k]] = field[pc[k]];   // snapshot, plant cells only
+        for (let k = 0; k < pc.length; k++) {
+          const i = pc[k], o = own[i];
           let acc = 0;
           for (const j of [i - 1, i + 1, i - W, i + W]) {
             if (j < 0 || j >= this.n || own[j] !== o || t[j] < CELL.ROOT) continue;
-            const d = field[j] - field[i];
+            const d = nx[j] - nx[i];
             if (d === 0) continue;
             // the DONOR is the higher side; if the donor is a store, it releases slowly.
             // Both cells of a pair agree on the donor, so the scheme stays conservative.
             const donor = d > 0 ? j : i;
             acc += (t[donor] === CELL.STORE ? rel : 1) * d;
           }
-          nx[i] = field[i] + r * acc;
+          field[i] = nx[i] + r * acc;
         }
       }
-      field.set(nx);
     }
   }
 
