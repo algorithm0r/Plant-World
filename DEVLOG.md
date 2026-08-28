@@ -45,6 +45,16 @@ interesting behaviour (t>5000) was minutes of wall-clock away. Fixed: founder ge
 status refreshed on a 400 ms interval, and the graph switched to live plant count. At ~15 s
 of watching: 57 plants, 119 born, 70 died, 48 banked. **Lesson: headless verification says
 nothing about the demo. Check the artifact the user actually looks at.**
+**Demo founder had no `B`, so the UI showed only bare stalks** — Chris caught that too. Asked
+whether evolution could find `B` on its own, the measurement says: yes, but slowly. Mutation
+generated 5 B-carrying seeds by t=20000 from a founder with none, yet none established. A
+positional sweep shows why — inserting one `B` into `GL@@@@@@!GLF*` gives 19/0/0/0/4/19/27/43
+surviving plants at positions 0..7: **lethal at 1-3, best at 7, and smooth in between**.
+Branching early splits a seedling's resources before it can earn; branching late splits a
+plant that can afford it. Demo founder switched to `GL@@@!GLBF*` (branches in the adult phase,
+and the best performer tested: 286 births/12k ticks vs 158 unbranched). Branching is visible
+about 2 seconds in. Recorded in MODEL.md — the positional gradient is an evolvability result,
+not just a demo fix.
 **Next:** get clonal reproduction to actually happen, then Stage 5 — disturbance, the
 water-source ablation, and diversity measured as modality rather than variance.
 

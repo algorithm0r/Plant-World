@@ -532,6 +532,27 @@ mechanisms make that possible here. All are cheap; none is optional if diversity
 4. **Local dispersal.** A global seed kernel means the best competitor wins everywhere. A
    local kernel leaves refuges, and dispersal distance becomes its own evolvable trade-off.
 
+### Measured: `B` has a smooth fitness gradient by POSITION
+
+Inserting a single `B` at successive positions in the founder `GL@@@@@@!GLF*` (8000 ticks,
+8 founders, plants surviving):
+
+| position | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 |
+|---|---|---|---|---|---|---|---|---|
+| plants | 19 | **0** | **0** | **0** | 4 | 19 | 27 | **43** |
+
+The same symbol is **lethal at positions 1-3 and beneficial at position 7**, and the gradient
+between them is smooth and monotone. Branching early splits a seedling's scarce resources
+before it can earn; branching late splits an established plant that can afford it. So position
+in the tape is a first-class fitness determinant, and — importantly for evolvability — the
+landscape over position is climbable rather than random.
+
+This also explains why branching does not appear on its own quickly. Mutation *does* generate
+`B` (5 B-carrying seeds banked by t=20000 from a founder with none), but at
+`mutPoint` x length / |alphabet| ≈ 0.014 per seed, and most of the positions it lands in are
+lethal. Evolution finds it; it just needs either longer runs, a higher mutation rate, or a
+founder that already branches.
+
 ### Why the encoding itself may favour distinct forms
 
 The mutational landscape is **anisotropic**. `@`-runs mutate in unary, so size and segment
