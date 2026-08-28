@@ -52,23 +52,29 @@ Nothing now blocks Stage 1. Remaining open items, none blocking:
 
 ---
 
-## Stage 1 — Grid + resource CA, no plants  [ ACTIVE ]
+## Stage 1 — Grid + resource CA, no plants  [ DONE ]
 Build and verify the environment alone, before any genome code exists.
-- [ ] Grid, cell types, soil/air layout in `world.js`; tunables into `params.js`
-- [ ] **Two water sources**: a water table diffusing upward, and episodic rain wetting the
+- [x] Grid, cell types, soil/air layout in `world.js`; tunables into `params.js`
+- [x] **Two water sources**: a water table diffusing upward, and episodic rain wetting the
       surface. Uptake consumes both. This is Walter's two-layer mechanism and it is the
       strongest single source of niche structure in the model.
-- [ ] **Spatially heterogeneous** moisture/terrain — a required feature, not a later polish
-- [ ] Transpiration: leaf area drains water every tick, growing or not
-- [ ] **Graded** light: top-down transmittance sweep with per-leaf τ, not a binary shadow
-- [ ] Observer renders the grid (moisture and light fields both visible)
-- [ ] `datamanager` records a field statistic
-**Done when:** moisture reaches a stable profile from a known initial condition; a
-hand-placed obstacle column produces the *graded* light profile it should (monotone decay
-with depth, matching τ^n within tolerance — not merely "dark below"); and `smoketest.mjs`
-asserts both numerically. No genome code anywhere yet.
+- [x] **Spatially heterogeneous** moisture/terrain — a required feature, not a later polish
+- [x] **Graded** light: top-down transmittance sweep with per-leaf τ, not a binary shadow
+- [x] Observer renders the grid (moisture, light and cell-type views)
+- [x] `datamanager` records the field statistics
+- [x] **Field capacity** — not in the original plan, added because it had to be. Without it
+      every cell drains into the table and the whole profile goes dry (measured: moisture
+      ≈0 above 7 rows from the table), which deletes the deep layer and with it half of
+      Walter's mechanism. Only moisture above field capacity drains.
+- ~~Transpiration~~ — moved to Stage 3. It is a *plant-level* drain and there are no plants
+  yet; implementing it here would mean faking a leaf→soil path that Stage 3 would undo.
+**Done when:** — met 2026-08-27. `smoketest.mjs` asserts 9 invariants, all passing: field
+convergence (net Δ 1.9e-6/tick after 4000 ticks), monotone depth profile, τ^k light
+attenuation to 6e-9, shade graded and non-zero under 5 leaves, rain spiking then decaying,
+the two layers distinguishable, seed reproducibility, and root uptake as a real sink.
+No genome code exists.
 
-## Stage 2 — Tips and the instruction set  [ PLANNED ]
+## Stage 2 — Tips and the instruction set  [ ACTIVE ]
 - [ ] `Tip`: position, heading, read head, per-tip working copy
 - [ ] **Tips are local accumulators**: a tip draws its node's water and sugar into itself
       and builds when it has banked enough. Never a shared plant pool.
@@ -85,6 +91,9 @@ counted-loop identities in `MODEL.md` hold exactly (`A ! B @@@ C` → `A;BBBB;C`
 
 ## Stage 3 — Couple growth to the economy  [ PLANNED ]
 - [ ] Two pools; root uptake, leaf photosynthesis, graph-neighbour transport
+- [ ] **Transpiration** (moved from Stage 1): leaf area drains water every tick, growing or
+      not. This is what makes drought lethal rather than merely slow, and therefore what
+      makes root:shoot genuinely contested.
 - [ ] Liebig-minimum growth gating; per-cell maintenance; per-symbol genome cost
 - [ ] One instruction per tip per tick, executed only if affordable; tips bank and wait
 - [ ] **Calibrate the economy slower than the clock** — the main tuning job of this stage.
