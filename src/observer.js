@@ -12,12 +12,15 @@ var Observer = class Observer {
     this.LEVELS = 32;
     this.wetPal = [];
     this.lightPal = [];
+    this.airPal = [];
     for (let k = 0; k < this.LEVELS; k++) {
       const v = k / (this.LEVELS - 1);
       // dry soil (warm brown) → saturated (deep blue)
       this.wetPal.push(rgb(96 - 54 * v, 68 - 20 * v, 44 + 130 * v));
       // light: black → pale warm white
       this.lightPal.push(rgb(255 * v, 250 * v, 225 * v));
+      // air light for the COMBINED view — dimmer, so plant tissue still reads against it
+      this.airPal.push(rgb(14 + 92 * v, 18 + 96 * v, 26 + 104 * v));
     }
     this.typeColour = [
       '#0b0e13', // AIR
@@ -35,16 +38,21 @@ var Observer = class Observer {
   draw(ctx) {
     const w = this.world, P = PARAMETERS, cs = P.cellSize;
     const view = P.view | 0, last = this.LEVELS - 1;
+    // view 0 puts BOTH resources on one picture: sky brightness is light (so canopy shadows
+    // are visible as dark columns), ground colour is soil moisture, plants in tissue colours.
     for (let y = 0; y < w.H; y++) {
       for (let x = 0; x < w.W; x++) {
         const i = y * w.W + x, t = w.type[i];
         let col;
-        if (view === 2) {
+        if (view === 3) {
           col = this.typeColour[t] || '#f0f';
         } else if (view === 1) {
           col = this.lightPal[clamp(Math.round(w.light[i] * last), 0, last)];
+        } else if (view === 2) {
+          col = (t === CELL.AIR) ? '#0b0e13'
+              : this.wetPal[clamp(Math.round(w.moisture[i] * last), 0, last)];
         } else {
-          if (t === CELL.AIR) col = '#0b0e13';
+          if (t === CELL.AIR) col = this.airPal[clamp(Math.round(w.light[i] * last), 0, last)];
           else if (t === CELL.LEAF) col = '#3fbf5f';
           else if (t === CELL.STEM) col = '#7a5a34';
           else if (t === CELL.SEED) col = '#e0d060';

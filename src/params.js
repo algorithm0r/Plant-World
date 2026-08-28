@@ -128,7 +128,8 @@ var PARAMETERS = {
                           // needs to show what the economy contributes.
 
   // --- view ---
-  view: 0,                // 0 = moisture, 1 = light, 2 = cell type
+  view: 0,                // 0 = combined (sky = light, ground = moisture), 1 = light only,
+                          // 2 = moisture only, 3 = cell type
 
   // --- engine ---
   updatesPerDraw: 1,      // fast-forward: sim updates per rendered frame
@@ -149,7 +150,7 @@ var PARAMETERS = {
 
 // Schema drives the auto-generated control panel (ui.js). One entry per live-tunable.
 var PARAM_SCHEMA = [
-  { key: 'view', label: 'View (0 wet/1 light/2 type)', min: 0, max: 2, step: 1 },
+  { key: 'view', label: 'View (0 both/1 light/2 wet/3 type)', min: 0, max: 3, step: 1 },
   { key: 'updatesPerDraw', label: 'Speed', min: 1, max: 60, step: 1 },
   { key: 'diffusion', label: 'Diffusion', min: 0, max: 0.24, step: 0.01 },
   { key: 'drainage', label: 'Drainage', min: 0, max: 0.3, step: 0.01 },

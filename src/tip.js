@@ -41,7 +41,8 @@ var Tip = class Tip {
     this.tape = tape;        // per-tip WORKING COPY — `!` and `@` mutate this, never the germline
     this.p = 0;              // read head
     this.k = 0;              // branch/leaf counter, drives delta face selection
-    this.age = 0;
+    this.age = 0;            // total steps, diagnostic only
+    this.idle = 0;           // consecutive steps WITHOUT building anything
     this.dead = false;
     this.water = 0;          // Stage 3
     this.sugar = 0;          // Stage 3
@@ -86,7 +87,12 @@ var Tip = class Tip {
 
   step(world) {
     if (this.dead) return;
-    if (++this.age > PARAMETERS.maxTipSteps) { this.die(world); return; }  // batch-run backstop only
+    // The backstop must fire on a tip that has stopped doing anything, NOT on one that has
+    // simply been alive a long time. Ageing out on lifetime killed healthy slow-growing
+    // meristems at exactly maxTipSteps and froze the plant — the step cap was doing the
+    // halting, which is the one thing it must never do.
+    this.age++;
+    if (++this.idle > PARAMETERS.maxTipSteps) { this.die(world); return; }
     const t = this.tape;
     if (this.p >= t.length) { this.die(world); return; }    // ran off the end — a determinate tip
     world.tipTicks++;
@@ -108,7 +114,10 @@ var Tip = class Tip {
         const c = t[this.p];
         const built = (c === 'L') ? this.leaf(world)
           : this.grow(world, c === 'R' ? CELL.ROOT : (c === 'S' ? CELL.STEM : -1));
-        if (built && !P.economyOff) { this.sugar -= P.cellSugarCost; this.water -= P.cellWaterCost; }
+        if (built) {
+          this.idle = 0;                                     // productive: reset the backstop
+          if (!P.economyOff) { this.sugar -= P.cellSugarCost; this.water -= P.cellWaterCost; }
+        }
         break;
       }
       case 'F': {
@@ -176,6 +185,7 @@ var Tip = class Tip {
     const child = Tip.spawn(this.plant, this.x, this.y, face, this.tape, world);
     if (!child) return;                                  // that face already carries a bud
     this.plant.addTip(child);
+    this.idle = 0;                                           // productive: reset the backstop
     this.k++;
   }
 
