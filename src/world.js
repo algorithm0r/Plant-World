@@ -44,6 +44,17 @@ var World = class World {
     // only that a face is VACANT is not enough: a genome like `B *` builds no cells, so the
     // faces stay vacant forever and tips grow exponentially.
     this.budMask = new Uint8Array(this.n);
+    // Per-cell PLANT pools, distinct from soil moisture. Tips are local accumulators: they
+    // draw from the node they sit on, never from a shared plant pool. That is what forecloses
+    // the proliferate-meristems exploit and what makes self-pruning possible.
+    this.pw = new Float32Array(this.n);   // plant water
+    this.ps = new Float32Array(this.n);   // plant sugar
+    this.pbuf = new Float32Array(this.n); // transport double-buffer
+    this.made = new Float32Array(this.n);  // sugar each leaf produced this tick
+    this.senesce = new Uint16Array(this.n);// consecutive ticks a leaf has been below its own cost
+    this.tipTicks = 0;                    // instrumentation: how often tips actually execute
+    this.tipExecs = 0;
+    this.cellDeaths = 0;
     this.plants = [];
     this.nextPlantId = 0;
     this.rng = makeRNG(PARAMETERS.seed);
@@ -83,6 +94,12 @@ var World = class World {
     const y = this.surfaceY[x];
     const pl = new Plant(this.nextPlantId++, genome, x, y);
     this.plants.push(pl);
+    // The seed is a real cell holding the endosperm, so the reserve sits IN the transport
+    // network and feeds the seedling until its first leaf earns. Tips start empty and draw
+    // from it like any other node.
+    this.place(x, y, CELL.SEED, pl);
+    this.ps[this.idx(x, y)] = PARAMETERS.seedSugar;
+    this.pw[this.idx(x, y)] = PARAMETERS.seedWater;
     pl.germinate(this);
     return pl;
   }
@@ -136,6 +153,10 @@ var World = class World {
     this.drain();
     this.evaporate();
     this.computeLight();
+    // physiology BEFORE development: a tip decides using this tick's supply
+    this.photosynthesise();
+    this.transport();
+    this.maintain();
     for (const pl of this.plants) if (pl.alive) pl.update(this);
     // NET change across the whole tick. Measuring only the diffusion step would report a
     // steady flux forever, because diffusion and drainage balance rather than both stopping.
@@ -166,8 +187,7 @@ var World = class World {
     }
   }
 
-  // Root cells draw from their own cell. Stage 1 records it as a diagnostic; Stage 3 pipes
-  // it into the tip's pool (tips are local accumulators — MODEL.md).
+  // Root cells draw soil water into the PLANT pool at their own cell.
   //
   // Uptake is PROPORTIONAL to available water (m - wiltingPoint), not min(rate, m). The
   // min() form is a step function: any cell above `rate` yields full uptake, so a root in
@@ -186,6 +206,7 @@ var World = class World {
       const take = Math.min(rate * avail, this.moisture[i]);
       this.moisture[i] -= take;
       this.uptake[i] = take;
+      this.pw[i] += take;
     }
   }
 
@@ -276,6 +297,90 @@ var World = class World {
     }
   }
 
+  // --- plant physiology ---------------------------------------------------
+
+  // Leaves fix carbon and lose water doing it. Photosynthesis REQUIRES water: stomata must
+  // open to admit CO2, and that is what the water is spent on. A leaf with no water makes no
+  // sugar, so drought costs carbon directly rather than merely slowing growth.
+  photosynthesise() {
+    const P = PARAMETERS, L = this.light, pw = this.pw, ps = this.ps, t = this.type;
+    this.made.fill(0);
+    for (let i = 0; i < this.n; i++) {
+      if (t[i] !== CELL.LEAF) continue;
+      const lit = L[i];
+      if (lit <= 0) continue;
+      const need = P.transpiration * lit;
+      const used = need > 0 ? Math.min(need, pw[i]) : 0;
+      pw[i] -= used;
+      if (need > 0) { const m = P.photoRate * lit * (used / need); ps[i] += m; this.made[i] = m; }
+    }
+  }
+
+  // Both pools diffuse between adjacent cells of the SAME plant. Water rises from roots and
+  // sugar descends from leaves purely by gradient — no directional pump. Tall plants are
+  // penalised by transport lag; treated as a feature until evidence says otherwise.
+  transport() {
+    const W = this.W, H = this.H, r = PARAMETERS.transportRate;
+    const t = this.type, own = this.owner;
+    const iters = PARAMETERS.transportIters | 0;
+    for (const field of [this.pw, this.ps])
+     for (let it = 0; it < iters; it++) {
+      const nx = this.pbuf;
+      nx.set(field);
+      for (let y = 0; y < H; y++) {
+        for (let x = 0; x < W; x++) {
+          const i = y * W + x;
+          if (t[i] < CELL.ROOT) continue;
+          const o = own[i];
+          let acc = 0;
+          if (x > 0 && t[i - 1] >= CELL.ROOT && own[i - 1] === o) acc += field[i - 1] - field[i];
+          if (x < W - 1 && t[i + 1] >= CELL.ROOT && own[i + 1] === o) acc += field[i + 1] - field[i];
+          if (y > 0 && t[i - W] >= CELL.ROOT && own[i - W] === o) acc += field[i - W] - field[i];
+          if (y < H - 1 && t[i + W] >= CELL.ROOT && own[i + W] === o) acc += field[i + W] - field[i];
+          nx[i] = field[i] + r * acc;
+        }
+      }
+      field.set(nx);
+    }
+  }
+
+  // Every living cell burns sugar, and carrying the genome costs extra per cell (every cell
+  // holds a copy, so bloat is taxed in proportion to size). A cell that cannot pay dies.
+  // This is the term that makes size expensive — and, if transport cannot reach a shaded
+  // branch, it is what should produce self-pruning and crown rise with no rule saying so.
+  maintain() {
+    const P = PARAMETERS, t = this.type, ps = this.ps;
+    if (P.economyOff) return;
+    for (const pl of this.plants) {
+      if (!pl.alive) continue;
+      const cost = P.maintenance + P.genomeCost * pl.genome.length;
+      for (const i of pl.cells) {
+        if (t[i] < CELL.ROOT || this.owner[i] !== pl.id) continue;
+        ps[i] -= cost;
+        // Leaf senescence: a LOCAL rule. A leaf earning less than it costs is below its light
+        // compensation point; sustain that and it is shed. This is what produces crown rise,
+        // and it targets shaded tissue rather than whatever sits furthest from a source.
+        if (t[i] === CELL.LEAF) {
+          if (this.made[i] < cost) {
+            if (++this.senesce[i] > P.leafSenescence) { this.killCell(i, pl); continue; }
+          } else this.senesce[i] = 0;
+        }
+        if (ps[i] < -P.cellDebtLimit) this.killCell(i, pl);
+      }
+      pl.cells = pl.cells.filter((i) => this.owner[i] === pl.id);
+    }
+  }
+
+  killCell(i, plant) {
+    const x = i % this.W, y = (i / this.W) | 0;
+    plant.counts[this.type[i]]--;
+    this.type[i] = (y >= this.surfaceY[x]) ? CELL.SOIL : CELL.AIR;
+    this.owner[i] = -1;
+    this.ps[i] = 0; this.pw[i] = 0; this.senesce[i] = 0; this.made[i] = 0;
+    this.budMask[i] = 0;                 // any bud on this cell goes with it
+    this.cellDeaths++;
+  }
+
   // --- metrics ------------------------------------------------------------
 
   // mean moisture over conducting cells that are not the fixed source
@@ -340,7 +445,8 @@ var World = class World {
     }
     return { plants: this.plants.length, alivePlants: alive, plantCells: cells,
              leafCells: leaf, rootCells: root, stemCells: stem, liveTips: tips,
-             maxHeight: height };
+             maxHeight: height, cellDeaths: this.cellDeaths,
+             execFraction: this.tipTicks ? this.tipExecs / this.tipTicks : 0 };
   }
 
   metrics() {

@@ -6,7 +6,9 @@
 // and sugar into itself and builds when it has banked enough. It never draws from a shared
 // plant pool — that is what forecloses the proliferate-meristems exploit and what makes
 // self-pruning work. Stage 2 has no economy, so every tip executes one instruction per tick
-// unconditionally; that is what makes the genome zoo deterministic and exactly checkable.
+// unconditionally. From Stage 3 an instruction executes only if the tip can pay for it, and
+// the economy is tuned slower than the clock — so the tick rate is only a ceiling and the
+// realized developmental rate is set by resource acquisition.
 //
 // Two failure modes, and they behave differently on purpose:
 //   can't FIT (target occupied, no free face) → no-op, read head ADVANCES. Crowding degrades
@@ -64,26 +66,59 @@ var Tip = class Tip {
   }
 
   // --- one instruction ---------------------------------------------------------
+  // Pull from the node this tip sits on — never from a shared plant pool. Several tips on
+  // one node draw from one node's bank, so heavy local branching means slow growth unless the
+  // node is well supplied.
+  draw(world) {
+    const i = world.idx(this.x, this.y);
+    const rate = PARAMETERS.tipDrawRate;
+    // clamp at 0: cells may run a sugar DEBT (see cellDebtLimit), and an unclamped min()
+    // makes the tip absorb that debt into its own bank — after which it can never afford to
+    // build again. This silently capped every plant at whatever its seed reserve funded.
+    // Clamp at 0: cells may run a sugar DEBT (cellDebtLimit), and an unclamped min() makes
+    // the tip absorb that debt into its own bank, after which it can never afford to build.
+    // The floor applies to SUGAR only — maintenance is paid in sugar, so water has no
+    // competing claim to reserve.
+    const w = Math.max(0, Math.min(rate, world.pw[i])); world.pw[i] -= w; this.water += w;
+    const floor = PARAMETERS.tipDrawFloor;
+    const g = Math.max(0, Math.min(rate, world.ps[i] - floor)); world.ps[i] -= g; this.sugar += g;
+  }
+
   step(world) {
     if (this.dead) return;
     if (++this.age > PARAMETERS.maxTipSteps) { this.die(world); return; }  // batch-run backstop only
     const t = this.tape;
     if (this.p >= t.length) { this.die(world); return; }    // ran off the end — a determinate tip
+    world.tipTicks++;
+    this.draw(world);
 
+    const P = PARAMETERS;
     switch (t[this.p]) {
-      // control flow: manages its own read head, never falls through to p++
-      case '!': this.tape = t.slice(this.p + 1); this.p = 0; return;
-      case '@': this.tape = t.slice(0, this.p) + t.slice(this.p + 1); this.p = 0; return;
-      case '*': this.p = 0; return;
-      // growth
-      case 'G': this.grow(world, -1); break;
-      case 'R': this.grow(world, CELL.ROOT); break;   // aerial roots
-      case 'S': this.grow(world, CELL.STEM); break;   // rhizomes, stolons
-      case 'L': this.leaf(world); break;
+      // control flow costs nothing and manages its own read head
+      case '!': this.tape = t.slice(this.p + 1); this.p = 0; world.tipExecs++; return;
+      case '@': this.tape = t.slice(0, this.p) + t.slice(this.p + 1); this.p = 0; world.tipExecs++; return;
+      case '*': this.p = 0; world.tipExecs++; return;
+      // B produces no cell, so it is free — the branch's real cost is paid by the cells the
+      // child goes on to build
       case 'B': this.branch(world); break;
-      case 'F': this.propagule(world); break;
+      // growth costs. CAN'T PAY → wait and bank, WITHOUT advancing the read head. That is a
+      // different failure from CAN'T FIT, which is a no-op that does advance.
+      case 'G': case 'R': case 'S': case 'L': {
+        if (!P.economyOff && (this.sugar < P.cellSugarCost || this.water < P.cellWaterCost)) return;
+        const c = t[this.p];
+        const built = (c === 'L') ? this.leaf(world)
+          : this.grow(world, c === 'R' ? CELL.ROOT : (c === 'S' ? CELL.STEM : -1));
+        if (built && !P.economyOff) { this.sugar -= P.cellSugarCost; this.water -= P.cellWaterCost; }
+        break;
+      }
+      case 'F': {
+        if (!P.economyOff && this.sugar < P.seedCost) return;                       // wait
+        if (this.propagule(world) && !P.economyOff) this.sugar -= P.seedCost;
+        break;
+      }
       default: break;                                  // unknown symbol: inert, never lethal
     }
+    world.tipExecs++;
     this.p++;
   }
 
@@ -93,20 +128,24 @@ var Tip = class Tip {
   grow(world, forceType) {
     const d = DIRS[this.heading];
     const nx = this.x + d.dx, ny = this.y + d.dy;
-    if (!world.inBounds(nx, ny)) return;                 // can't fit
+    if (!world.inBounds(nx, ny)) return false;           // can't fit
     const target = world.at(nx, ny);
-    if (!world.isVacant(target)) return;                 // occupied, or the water table
+    if (!world.isVacant(target)) return false;           // occupied, or the water table
     const type = forceType >= 0 ? forceType : (target === CELL.AIR ? CELL.STEM : CELL.ROOT);
     world.place(nx, ny, type, this.plant);
     // the bud moves with the tip: release the face it held, claim the one it now points at
     world.releaseBud(this.x, this.y, this.heading);
     this.x = nx; this.y = ny;
     world.claimBud(nx, ny, this.heading);
+    return true;
   }
 
   die(world) {
     this.dead = true;
     world.releaseBud(this.x, this.y, this.heading);
+    const i = world.idx(this.x, this.y);          // return the bank to the node
+    world.pw[i] += this.water; world.ps[i] += this.sugar;
+    this.water = 0; this.sugar = 0;
   }
 
   // A leaf is placed on a free LATERAL face and the tip does NOT move — otherwise the axis
@@ -115,12 +154,13 @@ var Tip = class Tip {
   // fails on POSITION, not on light level — reading light would be sensing (Stage 6).
   leaf(world) {
     const face = this.pickFace(world, lateralFaces(this.heading));
-    if (face < 0) return;                                // can't fit
+    if (face < 0) return false;                          // can't fit
     const d = DIRS[face];
     const nx = this.x + d.dx, ny = this.y + d.dy;
-    if (world.at(nx, ny) !== CELL.AIR) return;           // suppressed underground
+    if (world.at(nx, ny) !== CELL.AIR) return false;     // suppressed underground
     world.place(nx, ny, CELL.LEAF, this.plant);
     this.k++;
+    return true;
   }
 
   // Fork. The child sits at MY position with a rolled heading and reads from 0 of my CURRENT
@@ -142,10 +182,11 @@ var Tip = class Tip {
   // Stage 4 wires reproduction. Stage 2 just marks the cell so it is visible.
   propagule(world) {
     const face = this.pickFace(world, lateralFaces(this.heading));
-    if (face < 0) return;
+    if (face < 0) return false;
     const d = DIRS[face];
     world.place(this.x + d.dx, this.y + d.dy, CELL.SEED, this.plant);
     this.k++;
+    return true;
   }
 
   // delta as a FACE-SELECTION rule. On a lattice headings are quantised, so delta cannot be a

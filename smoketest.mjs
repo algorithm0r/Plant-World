@@ -203,9 +203,11 @@ check('* repeats without bound', star30.length > star10.length && star10.length 
 // --- 7. Growing plants. One germination, two tips (radicle + plumule), both reading the
 //     same genome from 0 — so positional cell fate alone must produce shoot above and root
 //     below with no extra symbols.
+// Stage 2 assertions test the INTERPRETER, so they run with the economy off (`economyOff`
+// is the control condition, and the same ablation Stage 5 uses). Stage 3 tests the economy.
 function grow(genome, ticks) {
   restore();
-  const w = fresh({ rainPeriod: 0 });
+  const w = fresh({ rainPeriod: 0, economyOff: true });
   const pl = w.plantSeed(genome, 100);
   const e = new GameEngine();
   for (let t = 1; t <= (ticks || 60); t++) { e.tick = t; w.update(e); }
@@ -246,9 +248,9 @@ check('S override makes underground stem (rhizome)', rs.below > 0,
 //     so face VACANCY alone would never bound it — tips grew exponentially until buds
 //     claimed their faces. This assertion is that fix.
 const prol = grow('B*', 200);
-check('B* is capped by geometry, not by cost', prol.pl.tips.length <= 4 && prol.tr.cells === 0,
+check('B* is capped by geometry, not by cost', prol.pl.tips.length <= 4 && prol.tr.cells <= 1,
   'B* -> ' + prol.pl.tips.length + ' tips at one node, ' + prol.tr.cells +
-  ' cells (unclaimed faces gave 71675 tips and still climbing)');
+  ' cell (the seed itself; unclaimed faces gave 71675 tips and still climbing)');
 
 // --- 9. The zoo: distinct, reproducible morphologies from a fixed seed.
 const ZOO = ['G@@@@@@', 'GL*', 'GGGGGG!GLB*', 'GGGGB*', 'GGGGRR@@@', 'GG!SSSSSSL*'];
@@ -262,6 +264,76 @@ check('zoo: ' + ZOO.length + ' genomes give distinct morphologies', distinct ===
   distinct + '/' + ZOO.length + ' distinct trait signatures');
 check('zoo: morphologies are reproducible from a fixed seed', reproducible,
   'cells/stem/leaf/root/h/d/br identical on a second run of all ' + ZOO.length);
+
+
+// ===========================================================================
+// STAGE 3 — the economy
+// ===========================================================================
+function growEcon(genome, ticks, col, over) {
+  restore();
+  const w = fresh(Object.assign({ economyOff: false }, over || {}));
+  const pl = w.plantSeed(genome, col === undefined ? 100 : col);
+  const e = new GameEngine();
+  const track = [];
+  for (let t = 1; t <= ticks; t++) {
+    e.tick = t; w.update(e);
+    if (t % 400 === 0) track.push(pl.cells.length);
+  }
+  return { w: w, pl: pl, tr: pl.traits(w), track: track };
+}
+function lowestLeafHeight(w, pl) {
+  const surf = w.surfaceY[pl.x];
+  let lo = 1e9;
+  for (const i of pl.cells) if (w.type[i] === CELL.LEAF) {
+    const h = surf - ((i / w.W) | 0); if (h < lo) lo = h;
+  }
+  return lo === 1e9 ? 0 : lo;
+}
+
+// --- 10. A plant establishes and then STOPS, without collapsing.
+const eco = growEcon('GL*', 2400);
+const stable = eco.track.slice(-3);
+const hasSettled = Math.max.apply(null, stable) - Math.min.apply(null, stable) <= 3;
+check('a plant establishes, then stops growing', eco.tr.cells > 20 && hasSettled,
+  'cells at t=400..2400: ' + eco.track.join(' → ') + '  (leaf=' + eco.tr.leaf +
+  ' root=' + eco.tr.root + ' h=' + eco.tr.height + ')');
+
+// --- 11. The economy is slower than the clock — the whole point of resource gating.
+//     A tip attempts one instruction per tick but executes only when it can pay.
+const ef = eco.w.tipExecs / Math.max(1, eco.w.tipTicks);
+check('economy is slower than the clock', ef > 0 && ef < 0.5,
+  'tip-ticks that executed = ' + (100 * ef).toFixed(1) + '%  (1 instruction/tick is the ceiling)');
+
+// --- 12. `*` self-terminates on the ECONOMY, not on the step cap. If any tip had aged out
+//     the backstop would be doing the halting, which is exactly what it must not do.
+let maxAge = 0;
+for (const t of eco.pl.tips) if (t.age > maxAge) maxAge = t.age;
+check('* halts on the economy, not the step cap', eco.pl.tips.length > 0 && maxAge < P.maxTipSteps,
+  'oldest live tip = ' + maxAge + ' steps, backstop = ' + P.maxTipSteps +
+  ' (a `*` meristem still holding, simply unable to afford growth)');
+
+// --- 13. SELF-PRUNING and CROWN RISE. Shaded lower leaves fall below their own light
+//     compensation point and are shed; the lit crown persists. Nothing says "prune".
+const lowStart = lowestLeafHeight(growEcon('GL*', 400).w, growEcon('GL*', 400).pl);
+const lowEnd = lowestLeafHeight(eco.w, eco.pl);
+check('self-pruning: crown rises as shaded leaves are shed', lowEnd > lowStart && eco.tr.root > 0,
+  'lowest living leaf ' + lowStart + ' → ' + lowEnd + ' with ' + eco.w.cellDeaths +
+  ' cells shed, and ' + eco.tr.root + ' roots retained (a distance-based rule kills roots first)');
+
+// --- 14. Water availability pays. The same genome on the lowest terrain (close to the
+//     table) must outperform it on the highest (far from it). Measured, not eyeballed.
+let hiCol = 0, loCol = 0;
+for (let x = 0; x < 200; x++) {
+  if (fresh({}).surfaceY[x] < fresh({}).surfaceY[hiCol]) hiCol = x;   // high ground, deep table
+  if (fresh({}).surfaceY[x] > fresh({}).surfaceY[loCol]) loCol = x;   // low ground, shallow table
+}
+const wRef = fresh({});
+const nearTable = growEcon('GL*', 2000, loCol);
+const farTable = growEcon('GL*', 2000, hiCol);
+check('a plant near the water table outperforms one far from it',
+  nearTable.tr.cells > farTable.tr.cells,
+  'surface row ' + wRef.surfaceY[loCol] + ' (near) → ' + nearTable.tr.cells + ' cells vs row ' +
+  wRef.surfaceY[hiCol] + ' (far) → ' + farTable.tr.cells + ' cells; table at row ' + wRef.tableY);
 
 // ---------------------------------------------------------------------------
 restore();

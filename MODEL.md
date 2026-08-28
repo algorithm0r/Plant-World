@@ -385,6 +385,46 @@ redesign, and is worth keeping available as an experimental condition.
 
 ---
 
+## Leaf senescence and self-pruning
+
+**A leaf earning less than it costs to maintain is shed after `leafSenescence` ticks.** This
+is a LOCAL rule — it reads the leaf's own carbon balance, not the plant's pooled balance —
+and it is the light compensation point, which is what actually triggers abscission in real
+plants.
+
+It was added in Stage 3 because measurement showed the general debt rule prunes the wrong
+tissue. Sugar does form a real gradient across a plant (bottom leaf at light 0.0002 sat at
+-0.038 sugar while the top leaf at light 1.0 sat at +0.009, monotone in between), so a
+distance-based rule does shed *something* — but roots are always furthest from the leaves, so
+it sheds the root system first and the plant dies of thirst. Crown rise reached height 21 with
+the root count at 0. With the local rule, crown rise stabilises at height 7 and 9 roots are
+retained.
+
+**Self-pruning and crown rise are emergent**, not coded: nothing anywhere says "prune". A
+shaded leaf simply stops paying for itself.
+
+## The overshoot instability — a known, unresolved limitation
+
+A tip commits to a new cell on its own local bank, with no reference to whether the whole
+plant can carry the added maintenance. When resources are abundant a plant overbuilds past
+its carbon budget; transport then keeps cell sugar fairly even, so cells cross the debt
+threshold together and the plant collapses rather than shedding gracefully.
+
+Measured: at low transpiration (water not limiting) a plant peaked at 99 cells and finished at
+0, with 119 cells shed. At higher transpiration the same genome settled at 45 cells with zero
+deaths — **water throttling is what currently prevents carbon overshoot**, which is a
+load-bearing accident rather than a designed mechanism.
+
+The consequence that matters for Stage 5: the response to seed provisioning is **non-monotone**.
+`GL*` gives 43 cells at seedSugar 2.5, 0 at 6, 9 at 12, 5 at 25. A fitness landscape with that
+shape is close to noise, and evolution will not do anything interpretable on it.
+
+**The candidate fix is storage** (already flagged from the cataphyll discussion): a pool that
+absorbs surplus instead of converting it straight into tissue, and is drawn down during
+deficit, damps exactly this oscillation. It is also what perennial overwintering, the seasonal
+storage effect, and tuber/bulb propagules need. Not yet implemented — this is a decision, not
+an oversight.
+
 ## Disturbance and temporal structure
 
 A spectrum from emergent to exogenous. They do different jobs and should be separate knobs,

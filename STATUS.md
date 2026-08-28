@@ -5,32 +5,31 @@
 **Verified:** never — no cold audit (`/audit`) has run yet; treat State as unverified
 
 ## Stage
-DEVPLAN **Stage 3 — Couple growth to the economy**  `[ ACTIVE ]`
-(Stage 0 design, Stage 1 environment, Stage 2 genome/tips are `[ DONE ]`.)
+DEVPLAN **Stage 3 — Couple growth to the economy**  `[ DONE ]`, but see Blockers.
+Stage 4 (reproduction) is next; a **storage** decision should come first.
 
 ## State
-**Stages 1–2 run, in-browser and headless — `smoketest.mjs` 23/23 PASS @ 2026-08-28** (~100s).
+**Stages 1-3 run, in-browser and headless — `smoketest.mjs` 28/28 PASS @ 2026-08-28.**
 
-*Environment:* heterogeneous terrain; two water sources (Dirichlet table + episodic patchy
-rain); field-capacity drainage; moisture-dependent unsaturated conductivity; wilting-point-
-scaled uptake; light-scaled evaporation; graded top-down light.
+*Environment:* heterogeneous terrain; two water sources (table + episodic rain); field
+capacity; moisture-dependent conductivity; wilting-point-scaled uptake; graded light.
 
-*Genome:* `G R S L B F ! @ *` executed per tip, one instruction per tick. Germination gives
-two tips (up + down) reading one genome, and positional cell fate makes shoot above / root
-below with no extra symbols. Six zoo genomes give distinct reproducible morphologies —
-counted stalk, leafy axis with alternating phyllotaxis, heteroblastic two-phase plant,
-recursive brancher, aerial roots, rhizome.
+*Genome:* `G R S L B F ! @ *` per tip. Germination gives two tips (up + down) reading one
+genome; positional cell fate makes shoot above / root below with no extra symbols.
 
-**Two-layer mechanism is measured, not assumed:** table-only, a root at depth 30 outdraws one
-at depth 2 by ~90x; with rain the ranking inverts.
+*Economy:* two per-cell pools; photosynthesis requires water; transpiration drains leaves
+whether growing or not; sub-stepped transport; per-cell maintenance with a genome-length
+surcharge; growth gated on the tip being able to pay. **2.1% of tip-ticks execute** — the
+economy is the halting condition, not the clock.
 
-**No economy yet, by design** — tips execute unconditionally, so plants grow without limit
-until they run off the tape or hit the geometric cap. Resource gating is Stage 3.
+**Emergent and verified:** self-pruning with crown rise — the lowest living leaf rises 2 → 7
+as shaded leaves fall below their own compensation point, 17 cells shed, 9 roots retained,
+with no rule saying prune. Also: near the table 43 cells vs 41 far from it; `*` meristems halt
+on the economy (oldest live tip 2400 steps vs a 4000 backstop).
 
-**Predicted failure mode, recorded before it happens:** built straightforwardly this model
-gives a monoculture height race. Graded light, two water sources, gap-size-structured
-disturbance and local dispersal are therefore structural requirements, not refinements.
-Stage 5 ablates each and measures its contribution.
+**Predicted failure mode, still recorded:** built straightforwardly this model gives a
+monoculture height race. Graded light, two water sources, gap-size-structured disturbance and
+local dispersal are structural requirements. Stage 5 ablates each.
 
 ## Metrics
 - Environment @600 ticks, defaults: meanMoisture 0.297, shallow 0.367, deep 0.271,
@@ -50,9 +49,19 @@ Stage 5 ablates each and measures its contribution.
   light (costed, deferred; day/night intensity rejected for v1); sensing/tropisms (Stage 6); continuous space.
 
 ## Next action
-Stage 3 — two pools, transpiration, per-cell maintenance, and the resource gate; then
-calibrate the economy slower than the clock. Acceptance includes **self-pruning**: shaded
-lower branches dying of their own maintenance cost, producing crown rise with no rule for it.
+Decide on **storage** before Stage 4. A pool that absorbs surplus rather than converting it
+straight into tissue, and is drawn down during deficit, damps the overshoot oscillation — and
+is the same mechanism perennial overwintering, the seasonal storage effect and tuber/bulb
+propagules need. `L` underground (currently a no-op) is the natural home for it: real
+underground leaves are cataphylls, and a bulb is a stack of them.
 
 ## Blockers
-- none
+- **Overshoot instability (blocks Stage 5).** Tips commit to cells on a local bank with no
+  reference to whole-plant carrying capacity; transport keeps cell sugar even, so an
+  overbuilt plant crosses the debt threshold everywhere at once and collapses instead of
+  shedding gracefully. Measured: peak 99 cells → final 0 at low transpiration. Water
+  throttling is currently the only thing preventing carbon overshoot, which is an accident
+  rather than a mechanism. Response to seed provisioning is **non-monotone** (`GL*`: 43 / 0 /
+  9 / 5 cells at seedSugar 2.5 / 6 / 12 / 25) and only 2 of 8 test genomes stay viable — too
+  close to noise for evolution to produce an interpretable result.
+  **Candidate fix: storage.** See MODEL.md. This is a decision, not an oversight.

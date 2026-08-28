@@ -39,6 +39,13 @@ var Plant = class Plant {
   }
 
   update(world) {
+    // a tip standing on a cell that starved goes with it (except the seed node itself,
+    // which is bare ground until the first cell is built)
+    for (const t of this.tips) {
+      if (t.dead) continue;
+      const i = world.idx(t.x, t.y);
+      if (world.owner[i] !== this.id && !(t.x === this.x && t.y === this.y)) t.die(world);
+    }
     for (const t of this.tips) t.step(world);
     if (this.pending.length) { this.tips = this.tips.concat(this.pending); this.pending = []; }
     // a tip that ran off its tape, aged out, or died is retained as history but stops running
@@ -51,6 +58,7 @@ var Plant = class Plant {
   // scalar — the diversity measure will change and runs are expensive (MODEL.md).
   traits(world) {
     let top = world.H, bottom = 0, left = world.W, right = 0;
+    this.cells = this.cells.filter((i) => world.owner[i] === this.id);
     for (const i of this.cells) {
       const x = i % world.W, y = (i / world.W) | 0;
       if (y < top) top = y;

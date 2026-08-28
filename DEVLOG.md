@@ -3,6 +3,52 @@ Newest entry on top. **Append only — never edit past entries.**
 
 <!-- append new entries above this line -->
 
+## 2026-08-28 — Stage 3: the economy; self-pruning emerges; an instability found
+**Done:** built the resource economy — per-cell plant pools for water and sugar, root uptake
+into the plant, photosynthesis that REQUIRES water (stomata open to admit CO2, so a leaf with
+no water fixes no carbon), transpiration draining leaves whether growing or not, sub-stepped
+transport between plant-graph neighbours, per-cell maintenance with a genome-length surcharge,
+and growth gated on the tip being able to pay. The seed is now a real endowed `SEED` cell so
+the endosperm sits inside the transport network.
+**Four bugs, each found by measurement:**
+  1. New cells were born with an empty pool and died the tick after being built. Fixed with a
+     debt tolerance (`cellDebtLimit`) plus the seed-as-cell endowment.
+  2. `draw()` used `Math.min(rate, ps[i])` — with debt tolerance `ps` can be negative, so tips
+     ABSORBED cell debt into their own banks (observed at -3.7, -5.3, -6.7) and could then
+     never afford to build. This silently capped every plant at whatever its seed funded, and
+     showed up as plant size scaling linearly with seedSugar (0.5→3 cells, 10→49).
+  3. Tip banks hoarded sugar that maintenance needed, starving the root system. Added a draw
+     floor — and applied it to SUGAR ONLY, since maintenance is paid in sugar and water has no
+     competing claim.
+  4. Single-pass diffusion gives a supply gradient growing as N^2, which starves anything past
+     ~20 cells. Real phloem is pressure-driven bulk flow. Added transport sub-steps, keeping
+     the lag (a feature) without the quadratic wall (a defect).
+**Added, not in the plan: local leaf senescence.** The general debt rule prunes by DISTANCE
+from the sugar source, and roots are always furthest, so it shed the root system first and
+plants died of thirst (crown rise reached height 21 with root count 0). A leaf below its own
+light compensation point for `leafSenescence` ticks is now shed — a local rule with a real
+referent. Crown rise then stabilises and roots survive.
+**Added: `economyOff`**, a control condition giving pure Stage 2 semantics. Stage 2 assertions
+test the interpreter under it; it is also the ablation Stage 5 needs.
+**Changed:** `world.js` (+pools, photosynthesise, transport, maintain, killCell, senescence),
+`tip.js` (draw/pay/wait; growth helpers report success), `plant.js`, `params.js` (economy
+block, calibrated), `smoketest.mjs` (+5 Stage 3 assertions; checks stream), `MODEL.md`,
+`DEVPLAN.md`.
+**State:** `node smoketest.mjs` → **28/28 PASS**. Stage 3 criteria all met: near the table 43
+cells vs 41 far from it; `*` halts on the economy (oldest live tip 2400 vs a 4000 backstop);
+2.1% of tip-ticks execute; **self-pruning with crown rise** — lowest living leaf 2 → 7, 17
+cells shed, 9 roots retained, with no rule saying prune.
+**Known limitation, recorded not hidden:** an **overshoot instability**. Tips commit to cells
+on a local bank with no reference to whole-plant carrying capacity, so an abundant plant
+overbuilds and, since transport keeps cell sugar even, all cells cross the debt threshold at
+once. At low transpiration a plant peaked at 99 cells and finished at 0. Water throttling is
+currently the only thing preventing carbon overshoot — a load-bearing accident. Response to
+seed provisioning is non-monotone (`GL*`: 43 / 0 / 9 / 5 cells at seedSugar 2.5 / 6 / 12 / 25)
+and only 2 of 8 test genomes stay viable. That landscape is too close to noise for Stage 5.
+**Next:** decide on **storage** — a pool absorbing surplus rather than converting it straight
+to tissue, drawn down in deficit. It damps this oscillation and is also what perennial
+overwintering, the seasonal storage effect and tuber/bulb propagules need.
+
 ## 2026-08-28 — Stage 2: the genome tape, tips, and morphology
 **Done:** built `Tip` (tape + read head + heading, per-tip working copy) and `Plant`
 (germline genome, concurrent tips, owned cells, trait vector). Germination spawns TWO tips,

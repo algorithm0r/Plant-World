@@ -96,26 +96,31 @@ cells the faces stayed empty forever — tips reached 71,675 and were still doub
 occupies one (cell, heading) slot, which is what actually enforces the geometric cap.
 
 ## Stage 3 — Couple growth to the economy  [ ACTIVE ]
-- [ ] Two pools; root uptake, leaf photosynthesis, graph-neighbour transport
-- [ ] **Transpiration** (moved from Stage 1): leaf area drains water every tick, growing or
+- [x] Two pools; root uptake, leaf photosynthesis, graph-neighbour transport (sub-stepped)
+- [x] **Transpiration** (moved from Stage 1): leaf area drains water every tick, growing or
       not. This is what makes drought lethal rather than merely slow, and therefore what
       makes root:shoot genuinely contested.
-- [ ] Liebig-minimum growth gating; per-cell maintenance; per-symbol genome cost
-- [ ] One instruction per tip per tick, executed only if affordable; tips bank and wait
+- [x] Growth gating; per-cell maintenance; per-symbol genome cost (per cell, so bloat is taxed with size)
+- [x] One instruction per tip per tick, executed only if affordable; tips bank and wait
       (Stage 2 executes unconditionally — the gate is this stage's job)
-- [ ] **Storage organs**: `L` underground currently no-ops (suppressed, per etiolation). Real
+- [ ] **Storage organs** — now the leading candidate fix for the overshoot instability, not
+      only a life-history feature. `L` underground currently no-ops (suppressed, per etiolation). Real
       underground leaves are cataphylls — scale leaves, and a bulb is a stack of them. Making
       them sugar-storage cells would give storage as an evolvable trait using an existing
       symbol, which is what perennial overwintering, the seasonal storage effect, and
       tuber/bulb clonal propagules all need.
-- [ ] **Calibrate the economy slower than the clock** — the main tuning job of this stage.
+- [x] **Calibrated: 2.1% of tip-ticks execute.** — the main tuning job of this stage.
       Instrument the fraction of tip-ticks that actually execute; it should be well under 1.
-- [ ] Starvation and tip death
-**Done when:** a genome grown at the water table outperforms the identical genome grown far
-from it, measured not eyeballed; a `*` meristem provably self-terminates where marginal sugar
-gain meets marginal maintenance rather than at a step cap; branching ratios come out
-plausible under uniform cell costs alone; and **self-pruning is observed** — shaded lower
-branches dying of their own maintenance cost, producing crown rise with no rule saying so.
+- [x] Starvation, cell death, and local leaf senescence
+**Done when:** — met 2026-08-28, all five criteria, 28/28 smoketest. Near the table 43 cells
+vs 41 far from it; `*` halts on the economy (oldest live tip 2400 steps against a 4000 backstop);
+2.1% of tip-ticks execute; **self-pruning observed** — lowest living leaf rises 2 → 7 with 17
+cells shed and 9 roots retained, no rule saying prune.
+
+**Not resolved, and it blocks Stage 5:** the **overshoot instability** (MODEL.md). Response to
+seed provisioning is non-monotone (`GL*`: 43 cells at seedSugar 2.5, 0 at 6, 9 at 12, 5 at 25),
+and only 2 of 8 test genomes stay viable. Evolution needs a smoother landscape than that.
+Candidate fix is **storage**; it is a decision, not an oversight.
 
 ## Stage 4 — Reproduction and inheritance  [ PLANNED ]
 - [ ] `F` propagules, **local** dispersal kernel, dormancy, germination
