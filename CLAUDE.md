@@ -52,6 +52,10 @@ append-only, newest on top (history); DEVPLAN stages carry `[ DONE ] / [ ACTIVE 
 tokens and a `**Done when:**` criterion. `/log-session` rewrites STATUS — don't hand-edit its
 `Verified:` line (that moves only on a cold `/audit`).
 
+## Publishing
+The live demo is https://algorithm0r.github.io/Plant-World/ and Pages serves the **`live`**
+branch. Pushing `main` does not update it. To publish: `git push origin main:live`.
+
 ## Run
 - Browser: open `index.html`.
 - Headless batch: `node runner.mjs --reps N` (writes to MongoDB via the Server).

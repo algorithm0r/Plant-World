@@ -46,7 +46,10 @@ dispersal are structural requirements. Stage 5 ablates each.
   scalar. Diversity computed post hoc, measured as **modality, not variance**.
 
 ## Branches
-- `main`
+- `main` — development
+- `live` — what GitHub Pages serves (https://algorithm0r.github.io/Plant-World/).
+  Publish with `git push origin main:live`; pushing `main` alone does NOT update the site.
+- tag `voxel-prototype-2023` — the June 2023 three.js prototype `main` was force-pushed over
 
 ## Open
 - Nothing blocking. Non-blocking: δ scope; calibrating "slower than the clock" (Stage 3);

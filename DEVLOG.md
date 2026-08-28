@@ -31,7 +31,16 @@ cells.
 200-wide world, so they survive further size changes.
 **State:** `node smoketest.mjs` -> **33/33 PASS** at the shipped 400-wide world. The suite
 runs the configuration that ships rather than a faster proxy, deliberately.
-**Note:** the repo is local-only — no remote, no `gh-pages`, no GitHub Pages site. Publishing
+**Published (later the same day).** Remote is `algorithm0r/Plant-World`, which turned out to
+ALREADY EXIST from June 2023 — a one-commit three.js voxel prototype of the same project,
+public, with Pages already live at the same URL. Chris chose to push over it. `main`
+force-pushed (`9c86480` -> `fba882f`); the old commit preserved as tag
+`voxel-prototype-2023`. Created a `live` branch and repointed Pages at it, so the site does
+not move when `main` does — publishing is `git push origin main:live`. Site verified 200 with
+all `src/` files serving. About description and homepage updated. The published page does hit
+the research Server (Chris's call), so visitors open a socket and the DataManager writes at
+`epoch`.
+**Superseded note:** the repo was local-only — no remote, no `gh-pages`, no GitHub Pages site. Publishing
 would need `src/db.js` neutered first: it dials `research.climbinggiants.com:8888` over
 socket.io, which would be a visible connection attempt from every visitor.
 
