@@ -3,6 +3,38 @@ Newest entry on top. **Append only — never edit past entries.**
 
 <!-- append new entries above this line -->
 
+## 2026-08-28 — world doubled to 400 wide; transport allocation bug
+**Done:** `gridW` 200 -> 400 (1600x600 px canvas). `terrainScale` doubled 2.5 -> 5.0 alongside
+it, because it counts undulations across the WIDTH — leaving it would have stretched every
+hill to twice its size and changed how much of the world is valley (table within root reach)
+versus ridge. Geometry preserved: valleys 10 rows to the table, ridges 27.
+**Performance, and my first guess was wrong.** Assumed `topSoilY`'s per-column O(H) scan was
+the bottleneck, cached it, gained almost nothing (340 -> 351 ticks/s). Profiling per phase
+showed **transport at 58% of the tick**, and the cause was its inner neighbour loop
+allocating a fresh `[i-1, i+1, i-W, i+W]` array per cell per sub-step — ~38k allocations/tick
+at 3200 cells. Unrolled: 340 -> 441 ticks/s at the largest populations, 651 -> 828 mid-run.
+Note that transport had ALREADY been "optimised" this session (grid scan -> plant-cell list,
+a real 3x win) and I moved on without profiling, so the allocation cost sat underneath
+undetected.
+**A near-miss worth recording.** Also pointed `uptakeStep` at the plant-cell list — which
+silently zeroed uptake, because `pcells` means "cells registered to a plant" and the Stage 1
+fixtures place a bare `ROOT` with `set()` and have no plants at all. Two sets that usually
+coincide are not the same set. Caught immediately only because uptake went to exactly
+0.0000/tick; a version that skipped only SOME roots would have looked like an economy
+calibration problem and sent me tuning `uptakeRate`. Reverted — it was 4% of the tick, and
+uptake should work for a root cell however it came to exist.
+**This is the fourth instance today of one mistake:** treating two things as the same set
+because they usually overlap — roots and the reachable water table, the tested genome and the
+shipped genome, the browser build and the headless build, and now registered cells and root
+cells.
+**Also:** smoketest probes are now width-relative (`w.W >> 1` etc.) instead of assuming a
+200-wide world, so they survive further size changes.
+**State:** `node smoketest.mjs` -> **33/33 PASS** at the shipped 400-wide world. The suite
+runs the configuration that ships rather than a faster proxy, deliberately.
+**Note:** the repo is local-only — no remote, no `gh-pages`, no GitHub Pages site. Publishing
+would need `src/db.js` neutered first: it dials `research.climbinggiants.com:8888` over
+socket.io, which would be a visible connection attempt from every visitor.
+
 ## 2026-08-28 — plant death, and: the two-layer mechanism had never been operating
 **The big one.** Chris asked why there was no branching; chasing that led to checking how deep
 roots actually grow, and: **roots reach ~14 rows while the water table sat 41-57 rows below

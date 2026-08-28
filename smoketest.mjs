@@ -59,7 +59,8 @@ run(wA, 4000);   // duration IS the claim here — do not trim
 const settled = wA.maxDelta;   // NET change across a whole tick, not the diffusion half-step
 // depths derived from the soil column, not hard-coded: at a shallower tableDepth the old
 // fixed depths (24, 32) fell BELOW the table and read as 0, breaking a test that was fine.
-const soilRows = wA.tableY - wA.surfaceY[100];   // the column the probes actually use
+const MID = wA.W >> 1;
+const soilRows = wA.tableY - wA.surfaceY[MID];   // the column the probes actually use
 const depths = [0, 1, 2, 3, 4, 5].map((k) => Math.floor(k * (soilRows - 1) / 5));
 const profile = depths.map((d) => wA.moistureAtDepth(d));
 let monotone = true;
@@ -78,7 +79,7 @@ check('moisture increases monotonically with depth', monotone,
 // ---------------------------------------------------------------------------
 restore();
 const wB = fresh({});
-const col = 40, topAir = wB.surfaceY[col] - 12;
+const col = wB.W >> 2, topAir = wB.surfaceY[col] - 12;
 for (let k = 0; k < 5; k++) wB.set(col, topAir + k, CELL.LEAF);
 wB.computeLight();
 const tau = P.tauLeaf;
@@ -129,7 +130,7 @@ check('two layers are distinguishable (deep wetter than dried surface)', deepC >
 restore();
 const wD = fresh({ rainPeriod: 0 });
 const wE = fresh({ rainPeriod: 0 });
-const rx = 70, ry = wD.surfaceY[rx] + 6;
+const rx = (wD.W * 0.35) | 0, ry = wD.surfaceY[rx] + 6;
 let identical = true;
 for (let i = 0; i < wD.n && identical; i++) {
   if (wD.type[i] !== wE.type[i] || Math.abs(wD.moisture[i] - wE.moisture[i]) > 0) identical = false;
@@ -160,7 +161,7 @@ function meanUptakeAt(depth, rainPeriod) {
   // settle times are part of the CLAIM here: the depth gradient needs time to develop, and
   // trimming them silently weakened the measured advantage from 13x to 10x. Do not trim.
   run(w, 3000);
-  const sx = 100;
+  const sx = w.W >> 1;
   w.set(sx, w.surfaceY[sx] + depth, CELL.ROOT);
   run(w, 2000);
   let tot = 0;
@@ -171,7 +172,7 @@ function meanUptakeAt(depth, rainPeriod) {
 // later argument would pick up whatever the previous call left behind (it left 0).
 const RAIN = BASE.rainPeriod;
 const probe = fresh({});
-const DEEP = Math.max(4, probe.tableY - probe.surfaceY[100] - 1);
+const DEEP = Math.max(4, probe.tableY - probe.surfaceY[probe.W >> 1] - 1);
 const dryShallow = meanUptakeAt(1, 0).uptake;
 const dryDeep = meanUptakeAt(DEEP, 0).uptake;
 const wetShallow = meanUptakeAt(1, RAIN).uptake;
@@ -279,7 +280,7 @@ function growEcon(genome, ticks, col, over) {
   restore();
   // random mortality is not under test here and killed the subject mid-measurement
   const w = fresh(Object.assign({ economyOff: false, plantMortality: 0 }, over || {}));
-  const pl = w.plantSeed(genome, col === undefined ? 100 : col);
+  const pl = w.plantSeed(genome, col === undefined ? (w.W >> 1) : col);
   const e = new GameEngine();
   const track = [];
   for (let t = 1; t <= ticks; t++) {
@@ -398,7 +399,7 @@ check('mutation generates heritable variation', allG.size > 3 && pm.meanGenomeLe
 function firstSeed(lam) {
   restore();
   const w = fresh({ mutPoint: 0, mutIndel: 0, mutSlip: 0, mutDup: 0, lamarckian: lam });
-  const pl = w.plantSeed(FOUNDER, 100);
+  const pl = w.plantSeed(FOUNDER, w.W >> 1);
   const e = new GameEngine();
   for (let t = 1; t <= 12000 && !w.seedBank.length; t++) { e.tick = t; w.update(e); }
   return { seed: w.seedBank[0], tapes: pl.tips.map((t) => t.tape) };

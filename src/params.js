@@ -7,7 +7,7 @@
 // No genome, no tips. See MODEL.md and DEVPLAN Stage 1.
 var PARAMETERS = {
   // --- grid ---
-  gridW: 200,             // cells across  (× cellSize = canvas width)
+  gridW: 400,             // cells across  (x cellSize = canvas width, so 1600 px)
   gridH: 150,             // cells down
   cellSize: 4,            // px per cell when rendering
   seed: 12345,            // drives terrain relief and rain patchiness; runs are reproducible
@@ -15,7 +15,11 @@ var PARAMETERS = {
   // --- terrain ---
   surfaceFraction: 0.55,  // mean soil surface, as a fraction of grid height from the top
   terrainAmp: 0.06,       // relief amplitude, as a fraction of grid height
-  terrainScale: 2.5,      // low-frequency undulations across the width
+  terrainScale: 5.0,      // undulations across the WIDTH, so it must scale with gridW or
+                          // hills stretch. Doubled alongside gridW 200->400 to keep each
+                          // hill the same size and simply give more of them — which matters,
+                          // because hill width sets how much of the world is valley (table
+                          // within root reach) versus ridge (not).
 
   // --- water source 1: the table (deep, reliable) ---
   tableDepth: 0.67,       // water table top, as a fraction of grid height from the top.

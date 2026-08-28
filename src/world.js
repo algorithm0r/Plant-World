@@ -40,6 +40,7 @@ var World = class World {
     this.light = new Float32Array(this.n);
     this.uptake = new Float32Array(this.n);   // water drawn by each root cell this tick
     this.surfaceY = new Int32Array(W);        // topmost soil row per column, at build time
+    this.topSoil = new Int32Array(W);         // topmost CONDUCTING row per column, cached
     this.owner = new Int32Array(this.n).fill(-1);  // plant id per cell, -1 = unowned
     // One bit per heading: which faces of this cell already carry a bud. A bud OCCUPIES a
     // face — two tips on the same node pointing the same way is not a thing. This is what
@@ -80,6 +81,7 @@ var World = class World {
     this.prev = new Float32Array(this.n);     // snapshot for the convergence diagnostic
     this.maxDelta = 1;                        // largest NET per-cell moisture change last tick
     this.buildTerrain();
+    for (let x = 0; x < W; x++) this.recomputeTop(x);
     this.computeLight();
   }
 
@@ -99,10 +101,12 @@ var World = class World {
 
   place(x, y, type, plant) {
     const i = y * this.W + x;
+    const was = this.type[i];
     this.type[i] = type;
     this.owner[i] = plant.id;
     if (type !== CELL.ROOT) this.moisture[i] = 0;   // non-conducting tissue holds no soil water
     plant.register(i, type);
+    if (conductsWater(was) !== conductsWater(type)) this.recomputeTop(x);
   }
 
   // --- reproduction ------------------------------------------------------
@@ -246,12 +250,18 @@ var World = class World {
     }
   }
 
-  // topmost water-conducting cell in a column (the surface that rain lands on and that
-  // evaporates). Scanned rather than cached because plants will change it from Stage 2.
-  topSoilY(x) {
+  // Topmost water-conducting cell in a column — the surface rain lands on and that
+  // evaporates. CACHED: rain and evaporate each read it for every column every tick, and a
+  // fresh O(H) scan per read cost 2 x W x H ops/tick, which became the dominant cost once the
+  // world doubled in width. Recomputed for one column only when that column changes.
+  topSoilY(x) { return this.topSoil[x]; }
+
+  recomputeTop(x) {
     const W = this.W;
-    for (let y = 0; y < this.H; y++) if (conductsWater(this.type[y * W + x])) return y;
-    return -1;
+    for (let y = 0; y < this.H; y++) {
+      if (conductsWater(this.type[y * W + x])) { this.topSoil[x] = y; return; }
+    }
+    this.topSoil[x] = -1;
   }
 
   // --- the tick -----------------------------------------------------------
@@ -259,6 +269,7 @@ var World = class World {
   update(engine) {
     this.tick = engine ? engine.tick : this.tick + 1;
     this.prev.set(this.moisture);
+    this.collectPlantCells();   // before uptake: the plant passes all read this list
     this.rain();
     this.uptakeStep();
     this.diffuse();
@@ -266,7 +277,6 @@ var World = class World {
     this.evaporate();
     this.computeLight();
     // physiology BEFORE development: a tip decides using this tick's supply
-    this.collectPlantCells();
     this.photosynthesise();
     this.transport();
     this.maintain();
@@ -321,6 +331,10 @@ var World = class World {
     this.uptake.fill(0);
     if (!rate) return;
     const span = 1 - wp;
+    // Deliberately scans the grid rather than the plant-cell list. It was only 4% of the
+    // tick, and restricting it to registered plant cells silently zeroed uptake for any ROOT
+    // placed directly (the Stage 1 fixtures do exactly that, having no plants at all).
+    // Uptake should work for a root cell however it came to exist.
     for (let i = 0; i < this.n; i++) {
       if (this.type[i] !== CELL.ROOT) continue;
       const avail = (this.moisture[i] - wp) / span;
@@ -462,18 +476,16 @@ var World = class World {
       for (let it = 0; it < iters; it++) {
         for (let k = 0; k < pc.length; k++) nx[pc[k]] = field[pc[k]];   // snapshot, plant cells only
         for (let k = 0; k < pc.length; k++) {
-          const i = pc[k], o = own[i];
-          let acc = 0;
-          for (const j of [i - 1, i + 1, i - W, i + W]) {
-            if (j < 0 || j >= this.n || own[j] !== o || t[j] < CELL.ROOT) continue;
-            const d = nx[j] - nx[i];
-            if (d === 0) continue;
-            // the DONOR is the higher side; if the donor is a store, it releases slowly.
-            // Both cells of a pair agree on the donor, so the scheme stays conservative.
-            const donor = d > 0 ? j : i;
-            acc += (t[donor] === CELL.STORE ? rel : 1) * d;
-          }
-          field[i] = nx[i] + r * acc;
+          const i = pc[k], o = own[i], x = i % W, mi = nx[i];
+          let acc = 0, j, d;
+          // Unrolled on purpose: `for (const j of [i-1, i+1, i-W, i+W])` allocated a fresh
+          // 4-element array per cell per sub-step — ~38k allocations/tick at 3200 cells,
+          // which made transport 58% of the whole tick.
+          if (x > 0)     { j = i - 1; if (own[j] === o && t[j] >= CELL.ROOT) { d = nx[j] - mi; if (d) acc += (t[d > 0 ? j : i] === CELL.STORE ? rel : 1) * d; } }
+          if (x < W - 1) { j = i + 1; if (own[j] === o && t[j] >= CELL.ROOT) { d = nx[j] - mi; if (d) acc += (t[d > 0 ? j : i] === CELL.STORE ? rel : 1) * d; } }
+          j = i - W; if (j >= 0        && own[j] === o && t[j] >= CELL.ROOT) { d = nx[j] - mi; if (d) acc += (t[d > 0 ? j : i] === CELL.STORE ? rel : 1) * d; }
+          j = i + W; if (j < this.n    && own[j] === o && t[j] >= CELL.ROOT) { d = nx[j] - mi; if (d) acc += (t[d > 0 ? j : i] === CELL.STORE ? rel : 1) * d; }
+          field[i] = mi + r * acc;
         }
       }
     }
@@ -579,6 +591,7 @@ var World = class World {
     this.owner[i] = -1;
     this.ps[i] = 0; this.pw[i] = 0; this.senesce[i] = 0; this.made[i] = 0;
     this.budMask[i] = 0;                 // any bud on this cell goes with it
+    this.recomputeTop(x);
     this.cellDeaths++;
   }
 
