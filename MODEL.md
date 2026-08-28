@@ -87,17 +87,52 @@ single merged pool would erase it.
      from one `B`, running identical programs, desynchronize on local conditions alone — the
      lit one runs ahead, the shaded one lags. This is the concrete numerical basis for the
      meristem differentiation that fork semantics was chosen for.
-  2. **Branching ratio becomes carbon-limited.** Make `B` expensive and `B` recursion bounds
-     itself, because a tip that cannot afford to fork waits. This is the economy-not-grammar
-     answer to the recursion-explosion worry, and it is how real branching is limited.
+  2. **Branching ratio becomes carbon-limited** — but through *cell* cost, not fork cost.
+     Whatever the tip count, a plant with income I can build only I/cost cells per tick, so
+     more tips means each grows slower. What limits real branching is the carbon to build
+     the branch, not the carbon to make the bud; dormant axillary buds are genuinely cheap.
+     See *Costs* for why `B` itself is free and what actually needs bounding.
   3. **Self-pruning and crown rise fall out.** With per-cell maintenance and local-ish sugar
      transport, shaded lower branches fail to pay their own maintenance and die. A clear bole
      under a crown is one of the most recognisable properties of a tree; getting it
      emergently rather than coding it is a strong signal the economy is calibrated.
 - **Maintenance** — every living cell costs sugar per tick. This is the term that makes
   size expensive and produces the size/allocation balance.
-- **Genome cost** — a small per-symbol build/carry cost, so genome length is selected on
-  rather than imposed. This is the bloat control (see `*` below).
+- **Genome cost** — a small per-symbol cost for *carrying* the tape (not for executing a
+  symbol), so genome length is selected on rather than imposed. This is the bloat control
+  (see `*` below).
+
+### Costs
+
+**Uniform by type.** Each cell type has one build cost, the same for every instance.
+`G` / `R` / `S` cost by the type produced; `L` costs a leaf. Control flow (`!`, `@`, `*`) is
+free. **`B` is free** — it produces no cell, only a new tip, and the branch's real cost is
+paid by whatever cells the child goes on to build. That matches the biology: dormant
+axillary buds are cheap, and carbon to build the branch is what limits branching.
+
+Two things do need bounding, and neither is the fork instruction:
+
+- **Tip proliferation.** A `B` inside a loop (`B *`, or `B` before an `@` run) makes tips
+  fork repeatedly. Cell count stays bounded by the economy, but *tip* count grows
+  exponentially. Left alone that is a sim-dies problem — millions of inert tips iterated
+  every tick.
+- **The allocation exploit, which is the serious one.** If a tip's resource draw scaled with
+  the number of tips — each pulling a share of a shared plant pool — then proliferating
+  meristems would be a way to claim more of the pool without building anything, and
+  evolution would find it. This is the classic degenerate-strategy failure mode.
+
+Both are handled without special-casing an instruction:
+
+1. **Tips draw from the local cell's pool, never a shared plant pool.** A thousand tips at
+   one position share that position's resources and gain nothing by existing. This kills the
+   exploit at the root, and it is also what makes shaded lower branches starve while lit ones
+   thrive — the mechanism self-pruning depends on.
+2. **A small per-tip maintenance cost.** Uniform in the same sense as cell maintenance: a
+   meristem is living tissue and costs upkeep even dormant. Max sustainable tips ≈ income /
+   tip-maintenance, so a large plant supports more meristems than a small one. This also
+   gives **apical dominance economics** for free — a tip is a lottery ticket on future growth
+   that taxes you every tick to hold, so how many dormant buds to keep becomes an evolvable
+   trade-off rather than a parameter.
 
 ---
 
@@ -344,14 +379,17 @@ Carried in DEVPLAN Stage 0. These are genuinely undecided, not merely unwritten.
 - **Is dead code behind `*` a reservoir or noise?** Depends on mutations accumulated while
   silenced ≈ rate × length × generations-dead. Below ~1, re-activation yields a variant of a
   recently-working program; well above, noise. Instrument it and measure rather than decide.
-- **Branching ratio.** `B` recursion is exponential in principle and bounded only by the
-  economy. Verify the economy actually bounds it at plausible ratios before assuming so.
+- **Tip proliferation.** Cell growth is bounded by the economy, but tip count is bounded only
+  by per-tip maintenance and local-pool allocation (see *Costs*). Both are reasoned, neither
+  is demonstrated. Verify early — a hand-written `B *` genome in Stage 2 will show it.
+- **Per-tip maintenance rate.** Sets the sustainable meristem count and therefore the whole
+  apical-dominance trade-off. Needs a number.
 - **Cell death and decay.** Do cells die of age as well as starvation? Does dead matter
   return to the soil? Without turnover, long runs just fill the grid.
 - **Collision.** Tip grows into an occupied cell — stall, die, or grow through? Self versus
   other-plant may differ.
-- **Instruction costs.** Flat per symbol, or scaling with depth/age/distance from root?
-  (`B` is known to need to be expensive — see *Resources*.)
+- **Cost schedule refinement.** v1 is uniform-by-type (see *Costs*). Whether costs should
+  ever scale with depth/age/distance-from-root is open, and deliberately not v1.
 - **Disturbance regime.** Gaps are required (see *Diversity*), but the form is open: random
   cell death, patch kills, seasonality, or emergent-only from starvation.
 - **Continuous space.** The δ design keeps it open; not yet costed.

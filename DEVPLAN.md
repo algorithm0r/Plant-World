@@ -2,9 +2,9 @@
 *Living document, not frozen. Update as the design evolves.*
 
 `MODEL.md` is the design bible — read it first; it carries the rationale, this file carries
-the work. The model is now substantially settled (design session 2026-08-27). Stage 0 is
-still `[ ACTIVE ]`: a short list of genuinely open decisions remains, and two of them
-(instructions-per-tick, the metric) must close before Stage 1 code is written.
+the work. The model is settled enough to build (design session 2026-08-27) — Stage 0 is
+`[ DONE ]` and Stage 1 is `[ ACTIVE ]`. The open items that remain are tuning numbers and
+deferred features, none of which block code.
 
 ## Built
 - Scaffolded from engine v2 (vanilla-JS canvas + standard DB client). Demo "drifters" model
@@ -40,9 +40,10 @@ Nothing now blocks Stage 1. Remaining open items, none blocking:
 - [ ] Cell death/decay and matter return; disturbance regime (random / patch / seasonal /
       emergent-only)
 - [ ] Collision rule (stall / die / grow through; self vs. other-plant)
-- [ ] Instruction cost schedule — `B` is known to need to be expensive
-- [ ] Whether the economy actually bounds `B` recursion at plausible branching ratios —
-      **check this early**, it is an assumption the design leans on
+- [ ] Per-tip maintenance rate — sets sustainable meristem count and the apical-dominance
+      trade-off
+- [ ] Whether per-tip maintenance + local-pool allocation actually bound tip proliferation —
+      **check this early** with a `B *` genome; both are reasoned, neither demonstrated
 - [ ] Environmental sensing / tropisms / a conditional symbol — the largest expressive gap,
       deliberately deferred (see Stage 6)
 - [ ] Continuous space — kept open by the δ design, not yet costed
@@ -65,15 +66,19 @@ with depth, matching τ^n within tolerance — not merely "dark below"); and `sm
 asserts both numerically. No genome code anywhere yet.
 
 ## Stage 2 — Tips and the instruction set  [ PLANNED ]
-- [ ] `Tip`: position, heading, read head, per-tip working copy, resource share
+- [ ] `Tip`: position, heading, read head, per-tip working copy
+- [ ] **Tips draw from the local cell's pool, never a shared plant pool** — this is what
+      forecloses the proliferate-meristems exploit; get it right here, not later
+- [ ] Per-tip maintenance cost
 - [ ] `G` / `R` / `S` / `L` with positional cell fate
 - [ ] `B` fork semantics, δ roll, concurrent tips
 - [ ] `!` / `@` / `*` with `!` as loop origin and `@` consumed
 - [ ] Hard step cap as a batch-run backstop only (the economy is the real halting condition)
 **Done when:** a hand-written genome zoo (≥6 genomes covering a counted `@` loop, an `!`-
 delimited two-phase program, a `*` indeterminate meristem, a `B` recursion, an `R` override
-and an `S` override) grows to reproducible, distinct morphologies from a fixed seed — and
-the counted-loop identities in `MODEL.md` hold exactly (`A ! B @@@ C` → `A;BBBB;C`).
+and an `S` override) grows to reproducible, distinct morphologies from a fixed seed; the
+counted-loop identities in `MODEL.md` hold exactly (`A ! B @@@ C` → `A;BBBB;C`); and a
+deliberate `B *` proliferation genome is shown **not** to run away.
 
 ## Stage 3 — Couple growth to the economy  [ PLANNED ]
 - [ ] Two pools; root uptake, leaf photosynthesis, graph-neighbour transport
@@ -84,9 +89,9 @@ the counted-loop identities in `MODEL.md` hold exactly (`A ! B @@@ C` → `A;BBB
 - [ ] Starvation and tip death
 **Done when:** a genome grown at the water table outperforms the identical genome grown far
 from it, measured not eyeballed; a `*` meristem provably self-terminates where marginal sugar
-gain meets marginal maintenance rather than at a step cap; `B` recursion is bounded by cost
-at a plausible branching ratio; and **self-pruning is observed** — shaded lower branches dying
-of their own maintenance cost, producing crown rise without any rule that says so.
+gain meets marginal maintenance rather than at a step cap; branching ratios come out
+plausible under uniform cell costs alone; and **self-pruning is observed** — shaded lower
+branches dying of their own maintenance cost, producing crown rise with no rule saying so.
 
 ## Stage 4 — Reproduction and inheritance  [ PLANNED ]
 - [ ] `F` propagules, **local** dispersal kernel, dormancy, germination

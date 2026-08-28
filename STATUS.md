@@ -33,8 +33,8 @@ dispersal are therefore structural requirements, not refinements. Stage 5 ablate
 ## Open
 - Nothing blocking. Non-blocking: δ scope; calibrating "slower than the clock" (Stage 3);
   τ per-leaf transmittance; cell death/decay and disturbance regime; collision rule;
-  instruction cost schedule (`B` must be expensive); whether the economy really bounds `B`
-  recursion — **check early**; sensing/tropisms (Stage 6); continuous space.
+  per-tip maintenance rate; whether per-tip maintenance + local-pool allocation really bound
+  tip proliferation — **check early**; sensing/tropisms (Stage 6); continuous space.
 
 ## Next action
 Stage 1 — grid, heterogeneous moisture, graded light. Verify the environment numerically
