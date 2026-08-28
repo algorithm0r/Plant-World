@@ -54,9 +54,17 @@ the fix goes in the resource economy, not in the grammar. Applied throughout bel
 - Soil cells carry `moisture`. Plant cells carry resource pools.
 - **Water**: diffuses from a water table/source. Consumed by root uptake, so root
   competition is real.
-- **Light**: modelled. In 2D, top-down column shadowing is O(width) and sufficient for
-  vertical light. 3D breaks this trick — see *Open*.
+- **Light**: modelled, and **graded, not binary**. Sweep each column top-down accumulating
+  transmittance: T starts at 1, each intervening leaf multiplies it by τ < 1 (stem lower).
+  A leaf receives light ∝ T. Still O(width × height), one multiply instead of a flag.
+  **This is not an optimisation, it is a precondition for diversity** — a binary lit/unlit
+  shadow makes shade lethal, which eliminates the understory niche and therefore canopy
+  stratification. See *Diversity and niches*. 3D breaks the column trick — see *Open*.
 - **CO2**: not modelled. Global constant.
+- **Heterogeneity is required, not decorative.** A flat water table under uniform light has
+  exactly one optimum and can only produce one strategy. Patchy moisture and uneven terrain
+  are what let a root-investing and a shoot-investing strategy each be locally best. First-
+  class parameters, present from Stage 1.
 
 ## Resources
 
@@ -69,6 +77,23 @@ single merged pool would erase it.
   roots, sugar descends from leaves. Tall plants are penalised by transport lag; this is
   treated as a feature, not a defect, until evidence says otherwise.
 - **Growth** requires both, Liebig-minimum style.
+- **Execution rate** — each tip attempts **one instruction per tick**, and executes it only
+  if it can pay. The economy is deliberately tuned **slower than the clock**, so the tick
+  rate is a ceiling and the realized developmental rate is set by resource acquisition. A
+  tip that cannot afford its next instruction banks and waits.
+
+  Three consequences, all wanted:
+  1. **Developmental timing becomes a phenotype, not a genome property.** Sibling tips forked
+     from one `B`, running identical programs, desynchronize on local conditions alone — the
+     lit one runs ahead, the shaded one lags. This is the concrete numerical basis for the
+     meristem differentiation that fork semantics was chosen for.
+  2. **Branching ratio becomes carbon-limited.** Make `B` expensive and `B` recursion bounds
+     itself, because a tip that cannot afford to fork waits. This is the economy-not-grammar
+     answer to the recursion-explosion worry, and it is how real branching is limited.
+  3. **Self-pruning and crown rise fall out.** With per-cell maintenance and local-ish sugar
+     transport, shaded lower branches fail to pay their own maintenance and die. A clear bole
+     under a crown is one of the most recognisable properties of a tree; getting it
+     emergently rather than coding it is a strong signal the economy is calibrated.
 - **Maintenance** — every living cell costs sugar per tick. This is the term that makes
   size expensive and produces the size/allocation balance.
 - **Genome cost** — a small per-symbol build/carry cost, so genome length is selected on
@@ -236,14 +261,81 @@ redesign, and is worth keeping available as an experimental condition.
 
 ---
 
+## Diversity and niches — the actual goal
+
+The hoped-for outcome is **diversity**: leafy bushes, tall trees, distinct recognisable growth
+forms, with the dynamics generating niches rather than the parameters assuming them.
+
+### The default outcome is a monoculture height race
+
+This is predictable now and should not be discovered in Stage 5. Light competition is
+**asymmetric** — a taller plant shades a shorter one and never the reverse — so it is
+winner-take-all, and every lineage evolves to be as tall as it can afford. One resource, no
+trade-off, one optimum, one strategy. (This is also what really happens: the height-as-
+competitive-game literature exists because real trees are taller than would be optimal for
+the stand. Height is competitive investment, not productive investment.)
+
+Diversity requires strategies to **limit themselves more than they limit each other**. Four
+mechanisms make that possible here. All are cheap; none is optional if diversity is the goal.
+
+1. **Graded light** (see *Grid and environment*). Binary shadow makes shade lethal and
+   deletes the understory niche outright. Highest-leverage single decision on this list.
+2. **Spatial heterogeneity.** Patchy water and uneven terrain, so root-investing and
+   shoot-investing strategies each have somewhere they win. The two-pool economy supplies the
+   trade-off axis; heterogeneity is what lets it pay off differently in different places.
+3. **Mortality and gaps.** Disturbance opening space is the classic generator of plant
+   diversity, via a colonisation-versus-competition trade-off — fast pioneers against slow
+   shade-tolerant late-successional forms. The underlying trade-off is **already latent in
+   the economy**: heavy leaf investment earns more sugar but costs more maintenance, so it
+   wins in light and starves in shade, and sparse investment does the reverse. That is the
+   leaf economics spectrum, obtained without adding a parameter.
+4. **Local dispersal.** A global seed kernel means the best competitor wins everywhere. A
+   local kernel leaves refuges, and dispersal distance becomes its own evolvable trade-off.
+
+### Why the encoding itself may favour distinct forms
+
+The mutational landscape is **anisotropic**. `@`-runs mutate in unary, so size and segment
+number vary continuously. But `B` and `*` are single symbols with enormous phenotypic
+consequence — branch or don't, determinate or indeterminate. Large-effect discrete switches
+are exactly what produces **distinct clusters rather than a continuum**, which is what niches
+look like in data.
+
+This matches real plants more closely than it has any right to: growth habit is often a few
+large-effect loci. `tb1` (teosinte branched1) is a single locus switching maize from bushy
+and tillering to a single stalk — the classic domestication-genetics result. The encoding
+reproduces that structure by accident: growth **form** is a discrete genomic switch, size
+**within** a form is continuous. This is a real, testable prediction of the model.
+
+### The research question, sharpened
+
+Not "does diversity emerge." Most coexistence models assume the strategies and ask whether
+they coexist. Here the strategies must be **discovered by evolution through a developmental
+encoding**. The question worth answering is: *do standard coexistence mechanisms still
+generate niches when morphology is evolved rather than parameterised?*
+
+### Measurement: store the vector, not a scalar
+
+Per plant, write a **trait vector** into the packet — height, width, root:shoot, leaf
+fraction, branch count, mean internode, genome length, clonal:sexual allocation, lifespan,
+realized fitness — and compute diversity post hoc. The diversity measure *will* change; runs
+are expensive; do not bake a scalar into the sim and lose the raw data.
+
+The measure itself must be **modality, not variance.** One strategy with noise produces a
+wide unimodal blob and an excellent-looking variance number. Niches mean *modes*. Headline
+measure: the number of distinct morphospace clusters sustained above ~1% abundance across
+many generations — coexistence **over time**, not in a snapshot. A bimodal height
+distribution is the specific signature of canopy/understory stratification.
+
 ## Open decisions
 
 Carried in DEVPLAN Stage 0. These are genuinely undecided, not merely unwritten.
 
-- **Instructions per tick.** Constant, or proportional to the tip's resource supply? The
-  latter makes well-fed plants develop *faster*, not merely larger, and changes what genome
-  length means in time.
 - **δ — one float per genome, or per-branch-point?**
+- **Calibrating "slower than the clock."** The execution rate is decided (above) but the
+  numbers are not. How much slower does the economy need to be before tips are usually
+  waiting rather than usually executing? This is the main tuning job of Stage 3.
+- **τ, the per-leaf light transmittance.** Sets how deep an understory can be, and therefore
+  how much stratification is even possible. A first-order control on diversity.
 - **Environmental sensing.** Positional cell fate is the free version. Nothing in the
   language yet *reads* the environment — no tropism (gravity, light, moisture), no
   conditional. Adding a query/conditional symbol is the Měch–Prusinkiewicz "open" move and
@@ -259,7 +351,9 @@ Carried in DEVPLAN Stage 0. These are genuinely undecided, not merely unwritten.
 - **Collision.** Tip grows into an occupied cell — stall, die, or grow through? Self versus
   other-plant may differ.
 - **Instruction costs.** Flat per symbol, or scaling with depth/age/distance from root?
-- **The metric.** What number goes to `plantworldDB`. Must exist before Stage 1.
+  (`B` is known to need to be expensive — see *Resources*.)
+- **Disturbance regime.** Gaps are required (see *Diversity*), but the form is open: random
+  cell death, patch kills, seasonality, or emergent-only from starvation.
 - **Continuous space.** The δ design keeps it open; not yet costed.
 
 ## Prior art
