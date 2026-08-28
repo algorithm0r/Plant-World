@@ -138,6 +138,48 @@ check('a root cell depletes its own cell', withRoot < control - 1e-4,
   '  (drawing ' + drawn.toFixed(4) + '/tick)');
 
 // ---------------------------------------------------------------------------
+// 5. THE TWO-LAYER TEST — the model's strongest niche axis, and the assertion that would
+//    have caught two silent flaws. Uptake must scale with available water (not min(rate,m),
+//    which is a step function that makes a root in nearly-dry soil perform identically to
+//    one in saturated soil), and the dry surface must be hydraulically DISCONNECTED from
+//    the table (constant conductivity lets the table wet the surface, so a shallow root
+//    lives off the table and the shallow/deep distinction collapses).
+//    The signature is that the ranking INVERTS between the two water regimes.
+// ---------------------------------------------------------------------------
+function meanUptakeAt(depth, rainPeriod) {
+  restore();
+  const w = fresh({ rainPeriod, evaporation: 0.010 });
+  run(w, 3000);
+  const sx = 100;
+  w.set(sx, w.surfaceY[sx] + depth, CELL.ROOT);
+  run(w, 2000);
+  let tot = 0;
+  for (let k = 0; k < 300; k++) { run(w, 1); for (let i = 0; i < w.n; i++) tot += w.uptake[i]; }
+  return { uptake: tot / 300, world: w };
+}
+// capture the base rain period FIRST — each call mutates P, so reading P.rainPeriod as a
+// later argument would pick up whatever the previous call left behind (it left 0).
+const RAIN = BASE.rainPeriod;
+const dryShallow = meanUptakeAt(2, 0).uptake;
+const dryDeep = meanUptakeAt(30, 0).uptake;
+const wetShallow = meanUptakeAt(2, RAIN).uptake;
+const wetDeep = meanUptakeAt(30, RAIN).uptake;
+
+check('depth pays when the table is the only source', dryDeep > dryShallow * 10,
+  'depth2=' + dryShallow.toExponential(1) + ' vs depth30=' + dryDeep.toExponential(1) +
+  '  (' + (dryDeep / dryShallow).toFixed(0) + '× — a step-function uptake gives 1×)');
+check('rain inverts the ranking (Walter two-layer signature)', wetShallow > wetDeep,
+  'with rain: depth2=' + wetShallow.toExponential(1) + ' > depth30=' + wetDeep.toExponential(1));
+
+restore();
+const wG = fresh({ rainPeriod: 0, evaporation: 0.010, uptakeRate: 0 });
+run(wG, 6000);
+const surfDry = wG.moistureAtDepth(0), deepDry = wG.moistureAtDepth(32);
+check('dry surface hydraulically disconnects from the table', surfDry < 0.05 && deepDry > 0.15,
+  'table-only surface=' + surfDry.toFixed(3) + ' deep=' + deepDry.toFixed(3) +
+  '  ratio=' + (surfDry / deepDry).toFixed(3) + '  (constant conductivity gives ~0.26)');
+
+// ---------------------------------------------------------------------------
 restore();
 const wF = fresh({});
 run(wF, 600);

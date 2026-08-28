@@ -52,6 +52,27 @@ the fix goes in the resource economy, not in the grammar. Applied throughout bel
 - 2D lattice: soil rows at the bottom, air above. (3D voxel later; see *Open*.)
 - Cell `type`: `soil`, `water_source`, `air`, `root`, `stem`, `leaf`, `seed`.
 - Soil cells carry `moisture`. Plant cells carry resource pools.
+- **Soil hydrology.** One moisture field per cell, 0..1, with three thresholds that each do
+  a distinct job. Soil *texture/porosity* is not modelled (a possible future heterogeneity
+  axis — sandy patches drain, clay patches hold); what matters more, and is modelled, is that
+  conductivity depends on how wet the soil already is.
+  - **Field capacity** (0.35): only moisture above it drains under gravity. Without this the
+    whole profile drains into the table and goes dry.
+  - **Unsaturated conductivity** K(m) = m^exp (exp=2): flux between cells is D·K(m̄)·Δm, with
+    K at the pair mean so the scheme stays conservative. **Dry soil is a poor conductor.**
+    With constant K the table wets the surface (measured: surface settles at 0.119 with rain
+    off), a shallow root lives off the table, and the two-layer distinction collapses. At
+    exp=2 the dry surface disconnects (0.009) while depth holds 0.302.
+  - **Wilting point** (0.08): below it water is held too tightly to extract. Uptake scales
+    with *available* water, (m − wiltingPoint), never `min(rate, m)` — a step function makes
+    a root at m=0.02 perform identically to one at m=1.0, which flattens the water niche
+    entirely (measured: depth 1 and depth 32 both returned exactly 0.0200/tick).
+
+  **Verified: a sink genuinely draws from the table.** With rain and evaporation off, soil
+  water stays flat while uptake continues indefinitely — the table resupplies through the
+  gradient. A dense root mat is supply-limited (640 roots got 2% of their demand), so
+  competition for water is real rather than nominal.
+
 - **Water — two qualitatively different sources, and the difference is the point.**
   - **Water table**: deep, reliable, reachable only by deep roots. Diffuses upward.
   - **Rain**: episodic, wets the *surface*, transient. Rewards shallow spreading roots and
@@ -63,6 +84,12 @@ the fix goes in the resource economy, not in the grammar. Applied throughout bel
   yields a deep-rooted and a shallow-rooted strategy that can coexist, and a clean ablation
   (rain only / table only / both) with the prediction that coexistence appears only in the
   third. Both are consumed by uptake, so competition is real.
+
+  **Measured, Stage 1: the ranking inverts between regimes.** Table only, a root at depth 30
+  outdraws one at depth 2 by ~90x (13x at the shorter smoketest settle). With rain, depth 2
+  outdraws depth 30. Two strategies, each best under a different water regime — the mechanism
+  is a demonstrated property of the environment, not an assumption, and two smoketest
+  assertions guard it.
 - **Light**: modelled, and **graded, not binary**. Sweep each column top-down accumulating
   transmittance: T starts at 1, each intervening leaf multiplies it by τ < 1 (stem lower).
   A leaf receives light ∝ T. Still O(width × height), one multiply instead of a flag.

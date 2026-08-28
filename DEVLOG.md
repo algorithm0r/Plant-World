@@ -3,6 +3,30 @@ Newest entry on top. **Append only — never edit past entries.**
 
 <!-- append new entries above this line -->
 
+## 2026-08-28 — soil hydraulics: two flaws found by asking whether a sink draws from the table
+**Done:** answered the question by measurement rather than argument. A sink *does* draw from
+the table (soil water flat at ~3650 while uptake ran indefinitely; a 640-cell root mat was
+supply-limited to 2% of demand, so competition is real). The same tests exposed two flaws
+that would have silently destroyed the strongest niche axis in the model:
+  1. **Uptake was `min(rate, m)`** — a step function. Any cell above `rate` yielded full
+     uptake, so roots at depth 1 and depth 32 both returned exactly 0.0200/tick. The water
+     niche was flat and depth paid nothing. Uptake now scales with *available* water
+     `(m − wiltingPoint)`, with a new `wiltingPoint` parameter.
+  2. **Constant hydraulic conductivity** let the table wet the surface (settled at 0.119 with
+     rain off), so a shallow root lived off the table and the shallow/deep distinction
+     collapsed. Now K(m) = m^exp evaluated at the pair mean (conservative), exp=2 chosen by
+     sweeping 0/1/2/3 — surface disconnects to 0.009 while depth holds 0.302.
+Also fixed a test bug: `meanUptakeAt(2, P.rainPeriod)` read `P.rainPeriod` after a previous
+call had left it at 0, so both "with rain" runs were silently rain-free.
+**Changed:** `world.js` (`diffuse` → per-pair unsaturated flux; `uptakeStep` → availability-
+scaled; new `conductivity()`), `params.js` (+`conductivityExp`, +`wiltingPoint`),
+`smoketest.mjs` (+3 assertions), `MODEL.md` (soil hydrology + the measured result).
+**State:** `node smoketest.mjs` → **12/12 PASS** in ~11s. The two-layer mechanism is now a
+measured property: table-only, depth 30 outdraws depth 2 by 90x (13x at smoketest settle
+times); with rain the ranking **inverts** and depth 2 outdraws depth 30 (2.7e-3 vs 2.1e-3).
+Dry surface disconnects at ratio 0.029 vs ~0.26 under constant conductivity.
+**Next:** Stage 2 — `Tip`, the instruction set, the geometric branch cap, the genome zoo.
+
 ## 2026-08-27 — Stage 1: environment CA built and verified, no plants
 **Done:** built the Stage 1 environment — heterogeneous terrain, soil moisture with two
 sources (a Dirichlet water table diffusing upward, episodic patchy rain wetting the surface),

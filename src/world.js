@@ -17,6 +17,15 @@ var CELL = { AIR: 0, SOIL: 1, WATER: 2, ROOT: 3, STEM: 4, LEAF: 5, SEED: 6 };
 // keeping the moisture field continuous through a root system rather than punching holes in it.
 function conductsWater(t) { return t === CELL.SOIL || t === CELL.WATER || t === CELL.ROOT; }
 
+// Unsaturated hydraulic conductivity between two cells, K(m̄) = m̄^exp. Symmetric in its two
+// arguments, which is what keeps the diffusion scheme conservative. exp=0 recovers the naive
+// constant-conductivity model.
+function conductivity(a, b, exp) {
+  if (!exp) return 1;
+  const mbar = 0.5 * (a + b);
+  return exp === 2 ? mbar * mbar : Math.pow(mbar, exp);
+}
+
 var World = class World {
   constructor(W, H) {
     this.W = W;
@@ -122,35 +131,52 @@ var World = class World {
 
   // Root cells draw from their own cell. Stage 1 records it as a diagnostic; Stage 3 pipes
   // it into the tip's pool (tips are local accumulators — MODEL.md).
+  //
+  // Uptake is PROPORTIONAL to available water (m - wiltingPoint), not min(rate, m). The
+  // min() form is a step function: any cell above `rate` yields full uptake, so a root in
+  // soil at 0.02 performs exactly as well as one at 1.0. That flattens the water niche
+  // completely — measured, depth 1 and depth 32 both returned 0.0200/tick — and leaves the
+  // deep/shallow trade-off nothing to grip.
   uptakeStep() {
-    const rate = PARAMETERS.uptakeRate;
+    const rate = PARAMETERS.uptakeRate, wp = PARAMETERS.wiltingPoint;
     this.uptake.fill(0);
     if (!rate) return;
+    const span = 1 - wp;
     for (let i = 0; i < this.n; i++) {
       if (this.type[i] !== CELL.ROOT) continue;
-      const take = Math.min(rate, this.moisture[i]);
+      const avail = (this.moisture[i] - wp) / span;
+      if (avail <= 0) continue;
+      const take = Math.min(rate * avail, this.moisture[i]);
       this.moisture[i] -= take;
       this.uptake[i] = take;
     }
   }
 
-  // Explicit diffusion over water-conducting cells. WATER cells are Dirichlet sources: they
-  // donate to their neighbours but are never themselves updated.
+  // Unsaturated flow. Flux between two cells is D · K(m̄) · Δm, where K(m) = m^exp is the
+  // moisture-dependent hydraulic conductivity and m̄ is the pair mean — symmetric in (i,j),
+  // so the scheme stays conservative. WATER cells are Dirichlet sources: they donate to
+  // their neighbours but are never themselves updated.
+  //
+  // The conductivity term is not decoration. With constant K the water table wets the
+  // surface (measured: surface settled at 0.119 with rain off), so a shallow root lives off
+  // the table and the shallow/deep distinction — Walter's two layers, the model's strongest
+  // niche axis — collapses. At exp=2 the dry surface disconnects (0.007) while depth holds
+  // 0.313. Real dry soil conducts water very poorly; that is what keeps the layers apart.
   diffuse() {
-    const W = this.W, H = this.H, D = PARAMETERS.diffusion;
+    const W = this.W, H = this.H, D = PARAMETERS.diffusion, e = PARAMETERS.conductivityExp;
     const m = this.moisture, nx = this.buf, t = this.type;
     nx.set(m);
     for (let y = 0; y < H; y++) {
       for (let x = 0; x < W; x++) {
         const i = y * W + x, ti = t[i];
         if (ti === CELL.WATER || !conductsWater(ti)) continue;
-        let sum = 0, cnt = 0;
-        if (x > 0 && conductsWater(t[i - 1])) { sum += m[i - 1]; cnt++; }
-        if (x < W - 1 && conductsWater(t[i + 1])) { sum += m[i + 1]; cnt++; }
-        if (y > 0 && conductsWater(t[i - W])) { sum += m[i - W]; cnt++; }
-        if (y < H - 1 && conductsWater(t[i + W])) { sum += m[i + W]; cnt++; }
-        if (!cnt) continue;
-        nx[i] = m[i] + D * (sum - cnt * m[i]);
+        const mi = m[i];
+        let acc = 0;
+        if (x > 0 && conductsWater(t[i - 1])) acc += conductivity(mi, m[i - 1], e) * (m[i - 1] - mi);
+        if (x < W - 1 && conductsWater(t[i + 1])) acc += conductivity(mi, m[i + 1], e) * (m[i + 1] - mi);
+        if (y > 0 && conductsWater(t[i - W])) acc += conductivity(mi, m[i - W], e) * (m[i - W] - mi);
+        if (y < H - 1 && conductsWater(t[i + W])) acc += conductivity(mi, m[i + W], e) * (m[i + W] - mi);
+        nx[i] = mi + D * acc;
       }
     }
     this.moisture = nx;

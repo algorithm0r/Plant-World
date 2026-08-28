@@ -1,28 +1,24 @@
 # Plant World — STATUS
 *One screen. The current pulse. Overwritten, never appended — for history read DEVLOG.*
 
-**Updated:** 2026-08-27 — refreshed every session close; may carry unverified claims
+**Updated:** 2026-08-28 — refreshed every session close; may carry unverified claims
 **Verified:** never — no cold audit (`/audit`) has run yet; treat State as unverified
 
 ## Stage
-DEVPLAN **Stage 1 — Grid + resource CA, no plants**  `[ ACTIVE ]`
-(Stage 0, the model design, is `[ DONE ]`.)
+DEVPLAN **Stage 2 — Tips and the instruction set**  `[ ACTIVE ]`
+(Stage 0 design and Stage 1 environment are `[ DONE ]`.)
 
 ## State
-Scaffold + a settled design; no Plant World code yet. The demo "drifters" model from engine
-v2 runs in-browser and headless — smoke PASS @ commit e1e26cd (2026-08-27).
+**Stage 1 environment runs, in-browser and headless — `smoketest.mjs` 12/12 PASS @ 2026-08-28.**
+Heterogeneous terrain; soil water with two sources (Dirichlet table + episodic patchy rain);
+field-capacity drainage; moisture-dependent unsaturated conductivity; wilting-point-scaled
+root uptake; light-scaled surface evaporation; graded top-down light. 0.27 ms/tick at 200x150.
 
-The model is designed and written into `MODEL.md`: goal is **evolved diversity** — distinct
-coexisting growth forms, niches from dynamics rather than assumption. Two resource pools with
-sugar-costed maintenance; one instruction per tip per tick, gated on resources, economy tuned
-slower than the clock; nine-symbol tape (`G R S L B F ! @ *`) with `B` as a concurrent fork;
-positional cell fate; clonal reproduction emergent from branching + disconnection;
-Weismannian germline; δ carries the encoding into both 2D and 3D.
+**The two-layer mechanism is measured, not assumed:** table-only, a root at depth 30 outdraws
+one at depth 2 by ~90x; with rain the ranking inverts. A sink genuinely draws from the table
+(soil water flat while uptake continues); a dense root mat is supply-limited to 2% of demand.
 
-Water has **two sources** — a deep table and episodic rain — which is Walter's two-layer
-mechanism and the strongest single source of niche structure here. Sugar is a stock cost
-(locked into structure); water is a flux requirement drained continuously by transpiration.
-Branching is capped by geometry (≤5 faces per node in 3D, ≤3 in 2D), not by economics.
+**No genome code exists yet** — no tips, no instruction set, no plants.
 
 **Predicted failure mode, recorded before it happens:** built straightforwardly this model
 gives a monoculture height race. Graded light, two water sources, gap-size-structured
@@ -30,8 +26,10 @@ disturbance and local dispersal are therefore structural requirements, not refin
 Stage 5 ablates each and measures its contribution.
 
 ## Metrics
-- (none — no model code yet). The DB record is decided: a **per-plant trait vector**, never a
-  diversity scalar. Diversity is computed post hoc, measured as **modality, not variance**.
+- Environment @600 ticks, defaults: meanMoisture 0.297, shallow 0.367, deep 0.271,
+  surfaceLight 1.000, totalWater 2904. Field converges to net delta 8.6e-6/tick.
+- Per-plant records decided but not yet written: a **trait vector**, never a diversity
+  scalar. Diversity computed post hoc, measured as **modality, not variance**.
 
 ## Branches
 - `main`
@@ -43,8 +41,8 @@ Stage 5 ablates each and measures its contribution.
   light (costed, deferred; day/night intensity rejected for v1); sensing/tropisms (Stage 6); continuous space.
 
 ## Next action
-Stage 1 — grid, two water sources (table + rain), heterogeneous moisture, graded light,
-transpiration. Verify the environment numerically before any genome code exists.
+Stage 2 — `Tip` as a local accumulator, the instruction set (`G R S L B F ! @ *`), `B`
+failing when a node has no free face, and a genome zoo asserting the counted-loop identities.
 
 ## Blockers
 - none

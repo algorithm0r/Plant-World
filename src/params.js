@@ -30,7 +30,11 @@ var PARAMETERS = {
   rainPatchScale: 3.0,    // spatial frequency of the patchiness
 
   // --- soil water transport ---
-  diffusion: 0.18,        // lateral+vertical diffusion coefficient (must be < 0.25 to be stable)
+  diffusion: 0.18,        // base transport coefficient (must be < 0.25 to be stable)
+  conductivityExp: 2,     // K(m) = m^exp — unsaturated hydraulic conductivity. Dry soil is a
+                          // very poor conductor (Richards); with a constant K the water table
+                          // wets the surface and the two layers stop being distinct.
+                          // 0 = constant K (the naive model), 2 = measured best separation.
   fieldCapacity: 0.35,    // soil holds water against gravity below this; only the EXCESS
                           // drains. Without it every cell drains into the table and the
                           // whole profile goes dry — the deep layer stops existing.
@@ -44,7 +48,12 @@ var PARAMETERS = {
   tauStem: 0.70,          // transmittance through a stem/root/seed cell
 
   // --- uptake (Stage 1: a diagnostic sink; Stage 3 pipes it into a tip's pool) ---
-  uptakeRate: 0.02,       // water a root cell draws from its own cell per tick
+  uptakeRate: 0.02,       // MAXIMUM water a root draws per tick, at full availability
+  wiltingPoint: 0.08,     // below this, water is held too tightly to extract at all.
+                          // Uptake scales with AVAILABLE water (m - wiltingPoint), never
+                          // min(rate, m) — a step function makes a root in nearly-dry soil
+                          // perform identically to one in saturated soil, which flattens the
+                          // entire water niche and leaves depth nothing to pay for.
 
   // --- view ---
   view: 0,                // 0 = moisture, 1 = light, 2 = cell type
@@ -73,6 +82,8 @@ var PARAM_SCHEMA = [
   { key: 'diffusion', label: 'Diffusion', min: 0, max: 0.24, step: 0.01 },
   { key: 'drainage', label: 'Drainage', min: 0, max: 0.3, step: 0.01 },
   { key: 'fieldCapacity', label: 'Field capacity', min: 0, max: 1, step: 0.05 },
+  { key: 'conductivityExp', label: 'Conductivity exp', min: 0, max: 4, step: 1 },
+  { key: 'wiltingPoint', label: 'Wilting point', min: 0, max: 0.4, step: 0.01 },
   { key: 'evaporation', label: 'Evaporation', min: 0, max: 0.05, step: 0.002 },
   { key: 'rainPeriod', label: 'Rain period (0=off)', min: 0, max: 600, step: 10 },
   { key: 'rainAmount', label: 'Rain amount', min: 0, max: 1, step: 0.05 },
