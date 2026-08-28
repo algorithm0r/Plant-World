@@ -117,6 +117,9 @@ vs 41 far from it; `*` halts on the economy (oldest live tip 2400 steps against 
 2.1% of tip-ticks execute; **self-pruning observed** — lowest living leaf rises 2 → 7 with 17
 cells shed and 9 roots retained, no rule saying prune.
 
+**Stage 3 is NOT closed:** storage organs above is still open, and it is the candidate fix
+for the instability below. The five acceptance criteria are met; the stage is not.
+
 **Not resolved, and it blocks Stage 5:** the **overshoot instability** (MODEL.md). Response to
 seed provisioning is non-monotone (`GL*`: 43 cells at seedSugar 2.5, 0 at 6, 9 at 12, 5 at 25),
 and only 2 of 8 test genomes stay viable. Evolution needs a smoother landscape than that.

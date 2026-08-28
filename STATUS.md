@@ -5,8 +5,10 @@
 **Verified:** never — no cold audit (`/audit`) has run yet; treat State as unverified
 
 ## Stage
-DEVPLAN **Stage 3 — Couple growth to the economy**  `[ DONE ]`, but see Blockers.
-Stage 4 (reproduction) is next; a **storage** decision should come first.
+DEVPLAN **Stage 3 — Couple growth to the economy**  `[ ACTIVE ]`.
+Five of six items done and all five acceptance criteria met, but **storage organs** is still
+unticked — and it is the candidate fix for the overshoot instability, so the stage is not
+finished. Stage 4 (reproduction + inheritance, incl. the mutation operators) follows.
 
 ## State
 **Stages 1-3 run, in-browser and headless — `smoketest.mjs` 28/28 PASS @ 2026-08-28.**
