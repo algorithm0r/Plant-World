@@ -37,23 +37,59 @@ var World = class World {
     this.light = new Float32Array(this.n);
     this.uptake = new Float32Array(this.n);   // water drawn by each root cell this tick
     this.surfaceY = new Int32Array(W);        // topmost soil row per column, at build time
+    this.owner = new Int32Array(this.n).fill(-1);  // plant id per cell, -1 = unowned
+    // One bit per heading: which faces of this cell already carry a bud. A bud OCCUPIES a
+    // face — two tips on the same node pointing the same way is not a thing. This is what
+    // actually enforces the geometric branch cap (<=3 per node in 2D, <=5 in 3D). Checking
+    // only that a face is VACANT is not enough: a genome like `B *` builds no cells, so the
+    // faces stay vacant forever and tips grow exponentially.
+    this.budMask = new Uint8Array(this.n);
+    this.plants = [];
+    this.nextPlantId = 0;
     this.rng = makeRNG(PARAMETERS.seed);
     this.tick = 0;
     this.raining = false;
     this.lastRainTick = -1;
     this.prev = new Float32Array(this.n);     // snapshot for the convergence diagnostic
     this.maxDelta = 1;                        // largest NET per-cell moisture change last tick
-    this.build();
+    this.buildTerrain();
     this.computeLight();
   }
 
   idx(x, y) { return y * this.W + x; }
   at(x, y) { return this.type[y * this.W + x]; }
   set(x, y, t) { this.type[y * this.W + x] = t; }
+  inBounds(x, y) { return x >= 0 && y >= 0 && x < this.W && y < this.H; }
+
+  budTaken(x, y, h) { return (this.budMask[y * this.W + x] & (1 << h)) !== 0; }
+  claimBud(x, y, h) { this.budMask[y * this.W + x] |= (1 << h); }
+  releaseBud(x, y, h) { this.budMask[y * this.W + x] &= ~(1 << h); }
+
+  // A cell a tip may build into. Plant cells block (self and other alike, in v1). WATER
+  // blocks too: it is the pinned Dirichlet source, and overwriting it would delete the
+  // deep half of the two-layer mechanism.
+  isVacant(t) { return t === CELL.AIR || t === CELL.SOIL; }
+
+  place(x, y, type, plant) {
+    const i = y * this.W + x;
+    this.type[i] = type;
+    this.owner[i] = plant.id;
+    if (type !== CELL.ROOT) this.moisture[i] = 0;   // non-conducting tissue holds no soil water
+    plant.register(i, type);
+  }
+
+  // Germinate a plant at the surface of column x. Two tips, up and down.
+  plantSeed(genome, x) {
+    const y = this.surfaceY[x];
+    const pl = new Plant(this.nextPlantId++, genome, x, y);
+    this.plants.push(pl);
+    pl.germinate(this);
+    return pl;
+  }
 
   // --- construction -------------------------------------------------------
 
-  build() {
+  buildTerrain() {
     const P = PARAMETERS, W = this.W, H = this.H;
     const tableY = clamp(Math.round(P.tableDepth * H), 2, H - 1);
     this.tableY = tableY;
@@ -100,6 +136,7 @@ var World = class World {
     this.drain();
     this.evaporate();
     this.computeLight();
+    for (const pl of this.plants) if (pl.alive) pl.update(this);
     // NET change across the whole tick. Measuring only the diffusion step would report a
     // steady flux forever, because diffusion and drainage balance rather than both stopping.
     let d = 0;
@@ -291,6 +328,21 @@ var World = class World {
     return c ? s / c : 0;
   }
 
+  plantMetrics() {
+    let cells = 0, leaf = 0, root = 0, stem = 0, tips = 0, height = 0, alive = 0;
+    for (const pl of this.plants) {
+      cells += pl.cells.length;
+      leaf += pl.counts[CELL.LEAF]; root += pl.counts[CELL.ROOT]; stem += pl.counts[CELL.STEM];
+      tips += pl.tips.length;
+      if (pl.alive) alive++;
+      const t = pl.traits(this);
+      if (t.height > height) height = t.height;
+    }
+    return { plants: this.plants.length, alivePlants: alive, plantCells: cells,
+             leafCells: leaf, rootCells: root, stemCells: stem, liveTips: tips,
+             maxHeight: height };
+  }
+
   metrics() {
     return {
       meanMoisture: this.meanMoisture(),
@@ -300,4 +352,6 @@ var World = class World {
       totalWater: this.totalWater(),
     };
   }
+
+  allMetrics() { return Object.assign(this.metrics(), this.plantMetrics()); }
 };

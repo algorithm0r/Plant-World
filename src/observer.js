@@ -47,11 +47,18 @@ var Observer = class Observer {
           if (t === CELL.AIR) col = '#0b0e13';
           else if (t === CELL.LEAF) col = '#3fbf5f';
           else if (t === CELL.STEM) col = '#7a5a34';
+          else if (t === CELL.SEED) col = '#e0d060';
+          else if (t === CELL.ROOT) col = '#b98a4a';
           else col = this.wetPal[clamp(Math.round(w.moisture[i] * last), 0, last)];
         }
         ctx.fillStyle = col;
         ctx.fillRect(x * cs, y * cs, cs, cs);
       }
+    }
+    // growth tips, so it is visible where development is actually happening
+    ctx.fillStyle = '#ff4fa3';
+    for (const pl of w.plants) for (const tp of pl.tips) {
+      ctx.fillRect(tp.x * cs - 1, tp.y * cs - 1, cs + 2, cs + 2);
     }
     // rain flash — one frame of a blue wash so episodic events are visible while watching
     if (w.raining) {

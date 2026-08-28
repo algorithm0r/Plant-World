@@ -3,6 +3,43 @@ Newest entry on top. **Append only — never edit past entries.**
 
 <!-- append new entries above this line -->
 
+## 2026-08-28 — Stage 2: the genome tape, tips, and morphology
+**Done:** built `Tip` (tape + read head + heading, per-tip working copy) and `Plant`
+(germline genome, concurrent tips, owned cells, trait vector). Germination spawns TWO tips,
+up and down — radicle and plumule — both reading the same genome from 0, so positional cell
+fate alone produces shoot above and root below with no extra symbols. Implemented
+`G R S L B F ! @ *`, delta as a lattice face-selection rule, and the two distinct failure
+modes (can't FIT → no-op and advance; can't PAY → wait, Stage 3). `L` underground is
+suppressed rather than converted — a leaf primordium in the dark is arrested pending light
+(skotomorphogenesis) — and it fails on POSITION, never on light level, since reading light
+would be sensing (Stage 6). Verified six morphologies by ASCII render: counted stalk, leafy
+axis with alternating phyllotaxis, two-phase heteroblastic plant, recursive brancher, aerial
+roots (`R` above ground), rhizome (`S` below ground).
+**Two bugs found, both real:**
+  1. **Method name collision.** `World` already had `build()` (terrain) and I added
+     `build(x,y,type,plant)`. The later class member wins, so every tip "growing" was calling
+     the *terrain constructor* and regenerating the whole world. Symptom was cells=0 while
+     tips still moved. Renamed to `place()` / `buildTerrain()`.
+  2. **Buds did not claim their face.** `B` checked only that a face was VACANT. `B*` builds
+     no cells, so faces stayed vacant forever and tips grew exponentially — 71,675 and still
+     doubling when the run was killed. The geometric cap bounds cells per node, not tips per
+     node. A tip now occupies one (cell, heading) slot via a per-cell bud bitmask; `B*` now
+     caps at 4 tips, 0 cells. This is the assertion that guards it.
+**Changed:** `tip.js` (rewritten from placeholder), new `plant.js`, `world.js` (+`place`,
+`plantSeed`, `budMask`, owner map, plant metrics), `params.js` (+genome, nSeeds, deltaIndex,
+maxTipSteps), `observer.js` (plant tissue + tip markers), `main.js`, `index.html`,
+`datamanager.js`/`runner.mjs` (allMetrics), `MODEL.md` (loop identities rewritten with real
+symbols — A/B/C read as instructions now that `B` is one; `L` row expanded).
+**State:** `node smoketest.mjs` → **23/23 PASS** (~100s; checks now stream as they run).
+Stage 2 additions: three counted-loop identities exact, `*` unbounded, positional fate
+(`G*` → 30 stem up / 30 root down from one program), `L` suppressed underground (20 leaves
+above, 0 below, alongside 20 root cells), `R` aerial roots (8 cells above surface), `S`
+rhizome (43 stem cells below surface), `B*` capped at 4 tips/0 cells, 6/6 zoo genomes
+distinct and reproducible. Browser stack runs: 3 plants, 16471 cells, 9954 tips in 217ms
+over 200 ticks. No economy yet — every tip executes unconditionally, by design.
+**Next:** Stage 3 — two pools, transpiration, per-cell maintenance, the resource gate, and
+calibrating the economy slower than the clock. Watch for self-pruning and crown rise.
+
 ## 2026-08-28 — characterised the moisture profile: throughflow, not a force balance
 **Done:** tested what actually sets the soil moisture profile, prompted by the question of
 whether gravity-down plus diffusion-up produces an emergent water level. It does not, in

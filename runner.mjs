@@ -21,7 +21,7 @@ const ticksOverride = parseInt(flag('ticks', '0'), 10);
 // class X`, so once the leading 'use strict' directive is stripped the top-level names attach
 // to globalThis and read as fast native globals (no vm proxy → no inlining penalty).
 const indirectEval = eval; // aliased → indirect eval runs in the global (sloppy) realm
-for (const f of ['util.js', 'params.js', 'engine.js', 'tip.js', 'world.js']) {
+for (const f of ['util.js', 'params.js', 'engine.js', 'tip.js', 'plant.js', 'world.js']) {
   let src = readFileSync(path.join(__dirname, 'src', f), 'utf8');
   src = src.replace(/^\s*(['"])use strict\1;?/, '');
   indirectEval(src);
@@ -43,9 +43,9 @@ for (let r = 0; r < reps; r++) {
   for (let t = 1; t <= limit; t++) {
     engine.tick = t;
     world.update(engine);
-    if (t % P.reportingPeriod === 0) { const m = world.metrics(); m.tick = t; samples.push(m); }
+    if (t % P.reportingPeriod === 0) { const m = world.allMetrics(); m.tick = t; samples.push(m); }
   }
-  const final = world.metrics();
+  const final = world.allMetrics();
   const pkt = db.packet(P, { run, samples, final });
   const res = await db.insert(collection || run, pkt);
   console.log(run + ': meanMoisture=' + final.meanMoisture.toFixed(4) +

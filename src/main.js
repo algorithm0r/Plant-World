@@ -9,6 +9,10 @@ function reset() {
   cv.width = PARAMETERS.gridW * PARAMETERS.cellSize;
   cv.height = PARAMETERS.gridH * PARAMETERS.cellSize;
   world = new World(PARAMETERS.gridW, PARAMETERS.gridH);
+  for (let k = 0; k < PARAMETERS.nSeeds; k++) {
+    const x = Math.floor((k + 0.5) * world.W / PARAMETERS.nSeeds);
+    world.plantSeed(PARAMETERS.genome, x);
+  }
   const graph = new LineGraph(10, 10, 200, 80, 'mean soil moisture');
   db = createDB(PARAMETERS.db);
   dataManager = new DataManager(world, db, graph);
@@ -17,8 +21,9 @@ function reset() {
   gameEngine.add(dataManager);
   gameEngine.add(graph);
   if (typeof setStatus === 'function') {
-    setStatus('Stage 1 — environment only. ' + world.W + '×' + world.H +
-      ' cells, water table at row ' + world.tableY + '. No plants yet.');
+    setStatus('Stage 2 — genome "' + PARAMETERS.genome + '", ' + PARAMETERS.nSeeds +
+      ' seed(s). ' + world.W + '×' + world.H + ' cells, table at row ' + world.tableY +
+      '. No economy yet: every tip runs one instruction per tick.');
   }
 }
 

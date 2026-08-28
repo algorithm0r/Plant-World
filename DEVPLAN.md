@@ -74,28 +74,40 @@ attenuation to 6e-9, shade graded and non-zero under 5 leaves, rain spiking then
 the two layers distinguishable, seed reproducibility, and root uptake as a real sink.
 No genome code exists.
 
-## Stage 2 — Tips and the instruction set  [ ACTIVE ]
-- [ ] `Tip`: position, heading, read head, per-tip working copy
-- [ ] **Tips are local accumulators**: a tip draws its node's water and sugar into itself
+## Stage 2 — Tips and the instruction set  [ DONE ]
+- [x] `Tip`: position, heading, read head, per-tip working copy
+- [x] **Tips are local accumulators**: a tip draws its node's water and sugar into itself
       and builds when it has banked enough. Never a shared plant pool.
-- [ ] `B` fails when the node has no free face (≤5 branches per node in 3D, ≤3 in 2D)
-- [ ] `G` / `R` / `S` / `L` with positional cell fate
-- [ ] `B` fork semantics, δ roll, concurrent tips
-- [ ] `!` / `@` / `*` with `!` as loop origin and `@` consumed
-- [ ] Hard step cap as a batch-run backstop only (the economy is the real halting condition)
+- [x] `B` fails when the node has no free face (≤5 branches per node in 3D, ≤3 in 2D)
+- [x] `G` / `R` / `S` / `L` with positional cell fate
+- [x] `B` fork semantics, δ as a lattice face-selection rule, concurrent tips
+- [x] `!` / `@` / `*` with `!` as loop origin and `@` consumed
+- [x] Hard step cap as a batch-run backstop only (the economy is the real halting condition)
 **Done when:** a hand-written genome zoo (≥6 genomes covering a counted `@` loop, an `!`-
 delimited two-phase program, a `*` indeterminate meristem, a `B` recursion, an `R` override
 and an `S` override) grows to reproducible, distinct morphologies from a fixed seed; the
-counted-loop identities in `MODEL.md` hold exactly (`A ! B @@@ C` → `A;BBBB;C`); and a
-`B *` genome is shown to cap out at the geometric branch limit rather than proliferating.
+counted-loop identities in `MODEL.md` hold exactly (`G!L@@@S` → `GLLLLS`,
+`G!L@@!S@@@F` → `GLLLSSSSF`, `G@@@` → `GGGG`); and `B*` caps at 4 tips on one node with 0
+cells rather than proliferating.
 
-## Stage 3 — Couple growth to the economy  [ PLANNED ]
+**Added during Stage 2, not in the plan:** buds must **claim** a face, not merely find one
+vacant. `B` originally checked only that the target face was empty, and since `B*` builds no
+cells the faces stayed empty forever — tips reached 71,675 and were still doubling. A tip now
+occupies one (cell, heading) slot, which is what actually enforces the geometric cap.
+
+## Stage 3 — Couple growth to the economy  [ ACTIVE ]
 - [ ] Two pools; root uptake, leaf photosynthesis, graph-neighbour transport
 - [ ] **Transpiration** (moved from Stage 1): leaf area drains water every tick, growing or
       not. This is what makes drought lethal rather than merely slow, and therefore what
       makes root:shoot genuinely contested.
 - [ ] Liebig-minimum growth gating; per-cell maintenance; per-symbol genome cost
 - [ ] One instruction per tip per tick, executed only if affordable; tips bank and wait
+      (Stage 2 executes unconditionally — the gate is this stage's job)
+- [ ] **Storage organs**: `L` underground currently no-ops (suppressed, per etiolation). Real
+      underground leaves are cataphylls — scale leaves, and a bulb is a stack of them. Making
+      them sugar-storage cells would give storage as an evolvable trait using an existing
+      symbol, which is what perennial overwintering, the seasonal storage effect, and
+      tuber/bulb clonal propagules all need.
 - [ ] **Calibrate the economy slower than the clock** — the main tuning job of this stage.
       Instrument the fraction of tip-ticks that actually execute; it should be well under 1.
 - [ ] Starvation and tip death

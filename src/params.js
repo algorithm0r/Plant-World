@@ -55,6 +55,18 @@ var PARAMETERS = {
                           // perform identically to one in saturated soil, which flattens the
                           // entire water niche and leaves depth nothing to pay for.
 
+  // --- genome / tips (Stage 2) ---
+  genome: 'GGGGGG!GLB*',  // the demo plant: a bare juvenile axis, then `!` commits to a
+                          // leafy branching adult phase repeated by `*`. Heteroblasty from
+                          // three symbols. Try 'GL*', 'G@@@@@@', 'GGGGB*', 'GG!SSSSSSL*'.
+  nSeeds: 3,              // seeds sown evenly across the width
+  deltaIndex: 1,          // face-selection rule for B and L. On a lattice headings are
+                          // quantised, so delta picks WHICH free face to take next rather
+                          // than a continuous divergence angle (MODEL.md).
+  maxTipSteps: 4000,      // batch-run backstop ONLY. The economy is the real halting
+                          // condition from Stage 3; this exists so a `*` loop cannot hang
+                          // a headless sweep. A run that hits it is reporting a problem.
+
   // --- view ---
   view: 0,                // 0 = moisture, 1 = light, 2 = cell type
 
@@ -90,6 +102,8 @@ var PARAM_SCHEMA = [
   { key: 'rainPatchiness', label: 'Rain patchiness', min: 0, max: 1, step: 0.05 },
   { key: 'tauLeaf', label: 'Leaf transmittance τ', min: 0.05, max: 0.95, step: 0.05 },
   { key: 'uptakeRate', label: 'Root uptake', min: 0, max: 0.1, step: 0.005 },
+  { key: 'deltaIndex', label: 'delta (face select)', min: 1, max: 5, step: 1, resets: true },
+  { key: 'nSeeds', label: 'Seeds', min: 1, max: 12, step: 1, resets: true },
   { key: 'terrainAmp', label: 'Terrain relief', min: 0, max: 0.15, step: 0.01, resets: true },
   { key: 'seed', label: 'Seed', min: 1, max: 99999, step: 1, resets: true },
 ];

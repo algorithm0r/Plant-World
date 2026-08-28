@@ -5,20 +5,27 @@
 **Verified:** never — no cold audit (`/audit`) has run yet; treat State as unverified
 
 ## Stage
-DEVPLAN **Stage 2 — Tips and the instruction set**  `[ ACTIVE ]`
-(Stage 0 design and Stage 1 environment are `[ DONE ]`.)
+DEVPLAN **Stage 3 — Couple growth to the economy**  `[ ACTIVE ]`
+(Stage 0 design, Stage 1 environment, Stage 2 genome/tips are `[ DONE ]`.)
 
 ## State
-**Stage 1 environment runs, in-browser and headless — `smoketest.mjs` 12/12 PASS @ 2026-08-28.**
-Heterogeneous terrain; soil water with two sources (Dirichlet table + episodic patchy rain);
-field-capacity drainage; moisture-dependent unsaturated conductivity; wilting-point-scaled
-root uptake; light-scaled surface evaporation; graded top-down light. 0.27 ms/tick at 200x150.
+**Stages 1–2 run, in-browser and headless — `smoketest.mjs` 23/23 PASS @ 2026-08-28** (~100s).
 
-**The two-layer mechanism is measured, not assumed:** table-only, a root at depth 30 outdraws
-one at depth 2 by ~90x; with rain the ranking inverts. A sink genuinely draws from the table
-(soil water flat while uptake continues); a dense root mat is supply-limited to 2% of demand.
+*Environment:* heterogeneous terrain; two water sources (Dirichlet table + episodic patchy
+rain); field-capacity drainage; moisture-dependent unsaturated conductivity; wilting-point-
+scaled uptake; light-scaled evaporation; graded top-down light.
 
-**No genome code exists yet** — no tips, no instruction set, no plants.
+*Genome:* `G R S L B F ! @ *` executed per tip, one instruction per tick. Germination gives
+two tips (up + down) reading one genome, and positional cell fate makes shoot above / root
+below with no extra symbols. Six zoo genomes give distinct reproducible morphologies —
+counted stalk, leafy axis with alternating phyllotaxis, heteroblastic two-phase plant,
+recursive brancher, aerial roots, rhizome.
+
+**Two-layer mechanism is measured, not assumed:** table-only, a root at depth 30 outdraws one
+at depth 2 by ~90x; with rain the ranking inverts.
+
+**No economy yet, by design** — tips execute unconditionally, so plants grow without limit
+until they run off the tape or hit the geometric cap. Resource gating is Stage 3.
 
 **Predicted failure mode, recorded before it happens:** built straightforwardly this model
 gives a monoculture height race. Graded light, two water sources, gap-size-structured
@@ -28,6 +35,8 @@ Stage 5 ablates each and measures its contribution.
 ## Metrics
 - Environment @600 ticks, defaults: meanMoisture 0.297, shallow 0.367, deep 0.271,
   surfaceLight 1.000, totalWater 2904. Field converges to net delta 8.6e-6/tick.
+- Demo genome `GGGGGG!GLB*`, 3 seeds, 200 ticks: 16471 plant cells (3361 leaf, 9377 root,
+  3733 stem), 9954 live tips, max height 55. 217 ms. Unbounded because Stage 3 is not built.
 - Per-plant records decided but not yet written: a **trait vector**, never a diversity
   scalar. Diversity computed post hoc, measured as **modality, not variance**.
 
@@ -41,8 +50,9 @@ Stage 5 ablates each and measures its contribution.
   light (costed, deferred; day/night intensity rejected for v1); sensing/tropisms (Stage 6); continuous space.
 
 ## Next action
-Stage 2 — `Tip` as a local accumulator, the instruction set (`G R S L B F ! @ *`), `B`
-failing when a node has no free face, and a genome zoo asserting the counted-loop identities.
+Stage 3 — two pools, transpiration, per-cell maintenance, and the resource gate; then
+calibrate the economy slower than the clock. Acceptance includes **self-pruning**: shaded
+lower branches dying of their own maintenance cost, producing crown rise with no rule for it.
 
 ## Blockers
 - none

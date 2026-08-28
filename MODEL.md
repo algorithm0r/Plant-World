@@ -252,9 +252,11 @@ Because `!` moves the origin that `@` returns to, the two compose into sequentia
 blocks:
 
 ```
-A ! B @@@ C          →  A ; B B B B ; C
-A ! B @@ ! C @@@ D   →  A ; B B B ; C C C C ; D
+G ! L @@@ S          →  G ; L L L L ; S
+G ! L @@ ! S @@@ F   →  G ; L L L ; S S S S ; F
 ```
+(Written with real symbols: `B` is the branch instruction, so A/B/C placeholders would read
+as instructions. Both identities are asserted exactly by `smoketest.mjs`.)
 
 Each `!` closes the previous loop and opens the next. n consecutive `@`s give n+1
 repetitions.

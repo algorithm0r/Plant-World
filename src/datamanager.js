@@ -17,7 +17,7 @@ var DataManager = class DataManager {
 
   update(engine) {
     if (engine.tick % PARAMETERS.reportingPeriod === 0) {
-      const m = this.world.metrics();
+      const m = this.world.allMetrics();
       m.tick = engine.tick;
       this.samples.push(m);
       if (this.graph) this.graph.push(m.meanMoisture);
@@ -31,7 +31,7 @@ var DataManager = class DataManager {
   async flush() {
     if (!this.db) return { ok: false };
     const pkt = this.db.packet(PARAMETERS, {
-      run: this.run, samples: this.samples, final: this.world.metrics(),
+      run: this.run, samples: this.samples, final: this.world.allMetrics(),
     });
     try {
       const res = await this.db.insert(this.run, pkt);

@@ -14,19 +14,22 @@ import path from 'path';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const indirectEval = eval; // aliased → runs in the global (sloppy) realm, so `var` leaks to globalThis
-for (const f of ['util.js', 'params.js', 'engine.js', 'tip.js', 'world.js']) {
+for (const f of ['util.js', 'params.js', 'engine.js', 'tip.js', 'plant.js', 'world.js']) {
   let src = readFileSync(path.join(__dirname, 'src', f), 'utf8');
   src = src.replace(/^\s*(['"])use strict\1;?/, ''); // strip directive so declarations leak to global
   indirectEval(src);
 }
 
 const P = globalThis.PARAMETERS;
-const { World, GameEngine, CELL } = globalThis;
+const { World, GameEngine, CELL, Tip } = globalThis;
+console.log('Plant World smoketest — Stage 1 environment + Stage 2 genome/tips');
 
 let failures = 0;
 const results = [];
 function check(name, ok, detail) {
-  results.push((ok ? '  PASS  ' : '  FAIL  ') + name + '   ' + detail);
+  const line = (ok ? '  PASS  ' : '  FAIL  ') + name + '   ' + detail;
+  results.push(line);
+  console.log(line);            // print as we go: the suite takes ~15s
   if (!ok) failures++;
 }
 // One engine per world, kept across calls: rain fires on `tick % rainPeriod`, so a fresh
@@ -179,15 +182,93 @@ check('dry surface hydraulically disconnects from the table', surfDry < 0.05 && 
   'table-only surface=' + surfDry.toFixed(3) + ' deep=' + deepDry.toFixed(3) +
   '  ratio=' + (surfDry / deepDry).toFixed(3) + '  (constant conductivity gives ~0.26)');
 
+
+// ===========================================================================
+// STAGE 2 — the genome tape, tips, and morphology
+// ===========================================================================
+
+// --- 6. Counted-loop identities, tested on the tape ALONE (no world at all).
+//     `!` moves the origin that `@` jumps to, and `@` is consumed, so the two compose into
+//     sequential counted blocks. These are the identities stated in MODEL.md.
+const idA = Tip.trace('G!L@@@S');
+const idB = Tip.trace('G!L@@!S@@@F');
+const idC = Tip.trace('G@@@');
+check('counted loop: G!L@@@S', idA === 'GLLLLS', 'got "' + idA + '" want "GLLLLS"');
+check('sequential loops: G!L@@!S@@@F', idB === 'GLLLSSSSF', 'got "' + idB + '" want "GLLLSSSSF"');
+check('unary @ run: G@@@ is 4 grows', idC === 'GGGG', 'got "' + idC + '" (n @s => n+1 reps)');
+const star10 = Tip.trace('L*', 10), star30 = Tip.trace('L*', 30);
+check('* repeats without bound', star30.length > star10.length && star10.length > 0,
+  'cap10 -> ' + star10.length + ' L, cap30 -> ' + star30.length + ' L');
+
+// --- 7. Growing plants. One germination, two tips (radicle + plumule), both reading the
+//     same genome from 0 — so positional cell fate alone must produce shoot above and root
+//     below with no extra symbols.
+function grow(genome, ticks) {
+  restore();
+  const w = fresh({ rainPeriod: 0 });
+  const pl = w.plantSeed(genome, 100);
+  const e = new GameEngine();
+  for (let t = 1; t <= (ticks || 60); t++) { e.tick = t; w.update(e); }
+  return { w: w, pl: pl, tr: pl.traits(w) };
+}
+function countBySide(r, type) {
+  let above = 0, below = 0;
+  for (const i of r.pl.cells) {
+    if (r.w.type[i] !== type) continue;
+    const x = i % r.w.W, y = (i / r.w.W) | 0;
+    if (y < r.w.surfaceY[x]) above++; else below++;
+  }
+  return { above: above, below: below };
+}
+
+const axis = grow('G*');
+check('one genome, two tissues (positional cell fate)',
+  axis.tr.stem > 5 && axis.tr.root > 5 && axis.tr.height > 5 && axis.tr.depth > 5,
+  'G* -> stem=' + axis.tr.stem + ' up ' + axis.tr.height + ', root=' + axis.tr.root +
+  ' down ' + axis.tr.depth + ' (same program, both directions)');
+
+const leafy = grow('GL*');
+const lf = countBySide(leafy, CELL.LEAF);
+check('L is suppressed underground (skotomorphogenesis)', lf.above > 5 && lf.below === 0,
+  'leaves above=' + lf.above + ' below=' + lf.below + ' with ' + leafy.tr.root + ' root cells');
+
+const aer = grow('GGGGRR@@@');
+const ar = countBySide(aer, CELL.ROOT);
+const rhi = grow('GG!SSSSSSL*');
+const rs = countBySide(rhi, CELL.STEM);
+check('R override makes aerial roots', ar.above > 0,
+  'root cells above the surface = ' + ar.above);
+check('S override makes underground stem (rhizome)', rs.below > 0,
+  'stem cells below the surface = ' + rs.below);
+
+// --- 8. The geometric branch cap. A bud OCCUPIES a face, so a node carries at most one tip
+//     per heading (<=4 in 2D, <=3 excluding the one it arrived from). `B *` builds no cells,
+//     so face VACANCY alone would never bound it — tips grew exponentially until buds
+//     claimed their faces. This assertion is that fix.
+const prol = grow('B*', 200);
+check('B* is capped by geometry, not by cost', prol.pl.tips.length <= 4 && prol.tr.cells === 0,
+  'B* -> ' + prol.pl.tips.length + ' tips at one node, ' + prol.tr.cells +
+  ' cells (unclaimed faces gave 71675 tips and still climbing)');
+
+// --- 9. The zoo: distinct, reproducible morphologies from a fixed seed.
+const ZOO = ['G@@@@@@', 'GL*', 'GGGGGG!GLB*', 'GGGGB*', 'GGGGRR@@@', 'GG!SSSSSSL*'];
+const sigs = ZOO.map((g) => { const r = grow(g); const t = r.tr;
+  return [t.cells, t.stem, t.leaf, t.root, t.height, t.depth, t.branches].join('/'); });
+const distinct = new Set(sigs).size;
+const repeat = ZOO.map((g) => { const t = grow(g).tr;
+  return [t.cells, t.stem, t.leaf, t.root, t.height, t.depth, t.branches].join('/'); });
+const reproducible = sigs.every((v, i) => v === repeat[i]);
+check('zoo: ' + ZOO.length + ' genomes give distinct morphologies', distinct === ZOO.length,
+  distinct + '/' + ZOO.length + ' distinct trait signatures');
+check('zoo: morphologies are reproducible from a fixed seed', reproducible,
+  'cells/stem/leaf/root/h/d/br identical on a second run of all ' + ZOO.length);
+
 // ---------------------------------------------------------------------------
 restore();
 const wF = fresh({});
 run(wF, 600);
 const m = wF.metrics();
 
-console.log('');
-console.log('Plant World — Stage 1 smoketest (environment only, no plants)');
-console.log(results.join('\n'));
 console.log('');
 console.log('metrics @600 ticks with defaults:  meanMoisture=' + m.meanMoisture.toFixed(4) +
   '  shallow=' + m.shallowMoisture.toFixed(4) + '  deep=' + m.deepMoisture.toFixed(4) +
