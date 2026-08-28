@@ -19,9 +19,15 @@ slower than the clock; nine-symbol tape (`G R S L B F ! @ *`) with `B` as a conc
 positional cell fate; clonal reproduction emergent from branching + disconnection;
 Weismannian germline; δ carries the encoding into both 2D and 3D.
 
+Water has **two sources** — a deep table and episodic rain — which is Walter's two-layer
+mechanism and the strongest single source of niche structure here. Sugar is a stock cost
+(locked into structure); water is a flux requirement drained continuously by transpiration.
+Branching is capped by geometry (≤5 faces per node in 3D, ≤3 in 2D), not by economics.
+
 **Predicted failure mode, recorded before it happens:** built straightforwardly this model
-gives a monoculture height race. Graded light, spatial heterogeneity, gaps and local
-dispersal are therefore structural requirements, not refinements. Stage 5 ablates them.
+gives a monoculture height race. Graded light, two water sources, gap-size-structured
+disturbance and local dispersal are therefore structural requirements, not refinements.
+Stage 5 ablates each and measures its contribution.
 
 ## Metrics
 - (none — no model code yet). The DB record is decided: a **per-plant trait vector**, never a
@@ -33,12 +39,12 @@ dispersal are therefore structural requirements, not refinements. Stage 5 ablate
 ## Open
 - Nothing blocking. Non-blocking: δ scope; calibrating "slower than the clock" (Stage 3);
   τ per-leaf transmittance; cell death/decay and disturbance regime; collision rule;
-  per-tip maintenance rate; whether per-tip maintenance + local-pool allocation really bound
-  tip proliferation — **check early**; sensing/tropisms (Stage 6); continuous space.
+  transpiration rate; gap size distribution; monocarpic senescence; angled day-sweeping
+  light (costed, deferred; day/night intensity rejected for v1); sensing/tropisms (Stage 6); continuous space.
 
 ## Next action
-Stage 1 — grid, heterogeneous moisture, graded light. Verify the environment numerically
-before any genome code exists.
+Stage 1 — grid, two water sources (table + rain), heterogeneous moisture, graded light,
+transpiration. Verify the environment numerically before any genome code exists.
 
 ## Blockers
 - none
