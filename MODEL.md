@@ -403,6 +403,43 @@ retained.
 **Self-pruning and crown rise are emergent**, not coded: nothing anywhere says "prune". A
 shaded leaf simply stops paying for itself.
 
+## Death, support, and storage
+
+**A plant is alive while it has tissue, not while it has tips.** Tying `alive` to tips made
+maintenance skip a plant that had stopped growing, so it froze into an immortal husk — the
+floating stems and leaves left standing after a collapse. A plant that stops growing is a
+mature plant; it keeps respiring and dies only when it cannot pay.
+
+**Structural support.** A cell must have a connected path through its own tissue to anchored
+tissue — a cell at or below the soil surface. A death lower down cuts everything above it
+loose, and cut-loose tissue cannot hang in the air, so it falls. Counted separately from
+starvation (`fallen` vs `cellDeaths`), because they mean different things.
+
+**Storage: `L` below ground builds a `STORE` cell** — a cataphyll. Real scale leaves are
+non-photosynthetic and often storage organs; a bulb is a stack of them. Same symbol, tissue
+set by position, exactly as `G` works. Storage **loads at the full transport rate but unloads
+at `storeRelease` times it**: starch has to be remobilised, which is slower than laying it
+down. That asymmetry makes a store a low-pass filter on the carbon budget.
+
+**What storage did and did not fix.** It did not stop the overshoot: a local store cannot
+rescue a whole-plant deficit when transport keeps every cell near the same level and they all
+cross the debt threshold together. What *did* stop the collapse in testing was **faster leaf
+senescence** — the collapse is a race between two shedding mechanisms, and the graceful one
+(senescence, targeted, gradual) was losing to the brutal one (the debt threshold, which fires
+everywhere at once). At `leafSenescence` 40 a plant reached 113 cells and held; at 120 it
+collapsed.
+
+**But speed costs the result it was meant to protect.** At 40 the plant keeps so few leaves
+that it no longer self-shades, so **crown rise disappears** and the water-table advantage
+reverses. This is a live trade-off with no settled value, not a tuning oversight.
+
+**Regression, recorded rather than hidden:** adding storage changed what `GL*` means. Its
+down-tip's `L` used to be a no-op; now it builds a store, so half the below-ground growth is
+bulb and the canopy is thinner. The crown-rise *signature* (lowest living leaf rising, 2 → 7)
+no longer reproduces. The *mechanism* is intact and still asserted — senescence fires, targets
+leaves, and spares roots — but the stronger claim needs a canopy dense enough to self-shade,
+which the current economy will not sustain.
+
 ## The overshoot instability — a known, unresolved limitation
 
 A tip commits to a new cell on its own local bank, with no reference to whether the whole

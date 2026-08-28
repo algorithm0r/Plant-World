@@ -103,8 +103,20 @@ occupies one (cell, heading) slot, which is what actually enforces the geometric
 - [x] Growth gating; per-cell maintenance; per-symbol genome cost (per cell, so bloat is taxed with size)
 - [x] One instruction per tip per tick, executed only if affordable; tips bank and wait
       (Stage 2 executes unconditionally — the gate is this stage's job)
-- [ ] **Storage organs** — now the leading candidate fix for the overshoot instability, not
-      only a life-history feature. `L` underground currently no-ops (suppressed, per etiolation). Real
+- [x] **Storage organs** — built: `L` below ground makes a `STORE` cataphyll, loading fast and
+      unloading slowly. It did NOT fix the overshoot (a local store cannot rescue a
+      whole-plant deficit); faster leaf senescence does, at the cost of crown rise. See
+      MODEL.md.
+- [x] Whole-plant death and structural support: `alive` means has tissue, not has tips;
+      cut-loose tissue falls. Fixes the floating stems/leaves left after a collapse.
+- [ ] **Nutrients + litter** — deliberately deferred until after a first evolution run, so
+      their contribution is measurable rather than baked in (same logic as the Stage 5
+      ablations). Design: a third soil pool; dead cells become litter rather than vanishing;
+      litter decays and restocks the soil; fallen leaves land on the surface. This closes a
+      plant→soil feedback the model currently lacks, and adds a third niche axis. Adding it
+      now would mean recalibrating a two-resource economy that is not yet stable.
+      *(Original note: leading candidate fix for the overshoot instability, not only a
+      life-history feature.)* `L` underground currently no-ops (suppressed, per etiolation). Real
       underground leaves are cataphylls — scale leaves, and a bulb is a stack of them. Making
       them sugar-storage cells would give storage as an evolvable trait using an existing
       symbol, which is what perennial overwintering, the seasonal storage effect, and

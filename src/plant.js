@@ -18,7 +18,9 @@ var Plant = class Plant {
     this.tips = [];
     this.pending = [];         // tips forked this tick, added after the sweep
     this.cells = [];           // indices of cells this plant owns
-    this.counts = [0, 0, 0, 0, 0, 0, 0];  // by CELL type
+    this.counts = [0, 0, 0, 0, 0, 0, 0, 0];  // by CELL type
+    this.dirty = false;        // a cell died this tick — support needs rechecking
+    this.fallen = 0;           // cells lost to being cut loose rather than to starvation
     this.branches = 0;
     this.alive = true;
   }
@@ -50,7 +52,12 @@ var Plant = class Plant {
     if (this.pending.length) { this.tips = this.tips.concat(this.pending); this.pending = []; }
     // a tip that ran off its tape, aged out, or died is retained as history but stops running
     this.tips = this.tips.filter((t) => !t.dead);
-    if (!this.tips.length) this.alive = false;
+    // `alive` means HAS TISSUE, not has tips. A plant that has stopped growing is a mature
+    // plant, not a dead one — it keeps respiring and dies only if it cannot pay. Tying
+    // `alive` to tips made maintenance skip it, so it froze into an immortal husk (the
+    // floating stems and leaves left standing after a collapse).
+    this.growing = this.tips.length > 0;
+    this.alive = this.cells.length > 0;
   }
 
   // --- trait vector -------------------------------------------------------
@@ -76,6 +83,8 @@ var Plant = class Plant {
       stem: this.counts[CELL.STEM],
       leaf: this.counts[CELL.LEAF],
       seed: this.counts[CELL.SEED],
+      store: this.counts[CELL.STORE],
+      fallen: this.fallen,
       height: Math.max(0, surf - top),        // cells above the local soil surface
       depth: Math.max(0, bottom - surf),      // cells below it
       width: this.cells.length ? right - left + 1 : 0,

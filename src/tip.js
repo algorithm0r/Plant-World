@@ -166,8 +166,10 @@ var Tip = class Tip {
     if (face < 0) return false;                          // can't fit
     const d = DIRS[face];
     const nx = this.x + d.dx, ny = this.y + d.dy;
-    if (world.at(nx, ny) !== CELL.AIR) return false;     // suppressed underground
-    world.place(nx, ny, CELL.LEAF, this.plant);
+    // Above ground a leaf; below ground a cataphyll — a non-photosynthetic scale leaf, which
+    // is what a bulb is made of. Same symbol, tissue set by position, exactly as `G` works.
+    const type = (world.at(nx, ny) === CELL.AIR) ? CELL.LEAF : CELL.STORE;
+    world.place(nx, ny, type, this.plant);
     this.k++;
     return true;
   }

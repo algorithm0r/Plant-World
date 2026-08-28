@@ -11,7 +11,10 @@
 // fixtures — that is how the light gradient and the uptake sink are verified before any
 // genome code exists (see smoketest.mjs).
 
-var CELL = { AIR: 0, SOIL: 1, WATER: 2, ROOT: 3, STEM: 4, LEAF: 5, SEED: 6 };
+// STORE is an underground leaf — a cataphyll. Real scale leaves are non-photosynthetic and
+// often storage organs; a bulb is a stack of them. So `L` below ground builds one rather
+// than being suppressed, which gives storage as an evolvable trait using an existing symbol.
+var CELL = { AIR: 0, SOIL: 1, WATER: 2, ROOT: 3, STEM: 4, LEAF: 5, SEED: 6, STORE: 7 };
 
 // Cells that conduct soil water. Roots sit IN soil, so they conduct as well as extract —
 // keeping the moisture field continuous through a root system rather than punching holes in it.
@@ -55,6 +58,8 @@ var World = class World {
     this.tipTicks = 0;                    // instrumentation: how often tips actually execute
     this.tipExecs = 0;
     this.cellDeaths = 0;
+    this.mark = new Int32Array(this.n);    // reusable flood-fill marker for prune()
+    this.markGen = 0;
     this.plants = [];
     this.nextPlantId = 0;
     this.rng = makeRNG(PARAMETERS.seed);
@@ -157,6 +162,7 @@ var World = class World {
     this.photosynthesise();
     this.transport();
     this.maintain();
+    this.prune();
     for (const pl of this.plants) if (pl.alive) pl.update(this);
     // NET change across the whole tick. Measuring only the diffusion step would report a
     // steady flux forever, because diffusion and drainage balance rather than both stopping.
@@ -323,6 +329,7 @@ var World = class World {
     const W = this.W, H = this.H, r = PARAMETERS.transportRate;
     const t = this.type, own = this.owner;
     const iters = PARAMETERS.transportIters | 0;
+    const rel = PARAMETERS.storeRelease;
     for (const field of [this.pw, this.ps])
      for (let it = 0; it < iters; it++) {
       const nx = this.pbuf;
@@ -333,10 +340,15 @@ var World = class World {
           if (t[i] < CELL.ROOT) continue;
           const o = own[i];
           let acc = 0;
-          if (x > 0 && t[i - 1] >= CELL.ROOT && own[i - 1] === o) acc += field[i - 1] - field[i];
-          if (x < W - 1 && t[i + 1] >= CELL.ROOT && own[i + 1] === o) acc += field[i + 1] - field[i];
-          if (y > 0 && t[i - W] >= CELL.ROOT && own[i - W] === o) acc += field[i - W] - field[i];
-          if (y < H - 1 && t[i + W] >= CELL.ROOT && own[i + W] === o) acc += field[i + W] - field[i];
+          for (const j of [i - 1, i + 1, i - W, i + W]) {
+            if (j < 0 || j >= this.n || own[j] !== o || t[j] < CELL.ROOT) continue;
+            const d = field[j] - field[i];
+            if (d === 0) continue;
+            // the DONOR is the higher side; if the donor is a store, it releases slowly.
+            // Both cells of a pair agree on the donor, so the scheme stays conservative.
+            const donor = d > 0 ? j : i;
+            acc += (t[donor] === CELL.STORE ? rel : 1) * d;
+          }
           nx[i] = field[i] + r * acc;
         }
       }
@@ -352,7 +364,8 @@ var World = class World {
     const P = PARAMETERS, t = this.type, ps = this.ps;
     if (P.economyOff) return;
     for (const pl of this.plants) {
-      if (!pl.alive) continue;
+      if (!pl.cells.length) continue;   // NOT `alive`: a plant that has stopped growing must
+                                        // keep respiring, or it freezes into an immortal husk
       const cost = P.maintenance + P.genomeCost * pl.genome.length;
       for (const i of pl.cells) {
         if (t[i] < CELL.ROOT || this.owner[i] !== pl.id) continue;
@@ -371,9 +384,39 @@ var World = class World {
     }
   }
 
-  killCell(i, plant) {
+  // Structural support. A plant cell must have a connected path through its own tissue to
+  // anchored tissue — a cell at or below the soil surface. Anything else has been cut loose
+  // by a death somewhere below it and cannot hang in the air, so it falls.
+  // Runs only for plants that lost a cell this tick.
+  prune() {
+    for (const pl of this.plants) {
+      if (!pl.dirty || !pl.cells.length) { pl.dirty = false; continue; }
+      pl.dirty = false;
+      const keep = this.mark, stack = [];
+      this.markGen++;
+      const gen = this.markGen;
+      for (const i of pl.cells) {
+        const x = i % this.W, y = (i / this.W) | 0;
+        if (y >= this.surfaceY[x]) { keep[i] = gen; stack.push(i); }  // anchored in the ground
+      }
+      while (stack.length) {
+        const i = stack.pop();
+        for (const j of [i - 1, i + 1, i - this.W, i + this.W]) {
+          if (j < 0 || j >= this.n || keep[j] === gen) continue;
+          if (this.owner[j] !== pl.id || this.type[j] < CELL.ROOT) continue;
+          keep[j] = gen; stack.push(j);
+        }
+      }
+      for (const i of pl.cells.slice()) if (keep[i] !== gen) this.killCell(i, pl, true);
+      pl.cells = pl.cells.filter((i) => this.owner[i] === pl.id);
+    }
+  }
+
+  killCell(i, plant, fell) {
     const x = i % this.W, y = (i / this.W) | 0;
     plant.counts[this.type[i]]--;
+    plant.dirty = true;                  // a death can cut tissue loose; prune() will check
+    if (fell) plant.fallen++;
     this.type[i] = (y >= this.surfaceY[x]) ? CELL.SOIL : CELL.AIR;
     this.owner[i] = -1;
     this.ps[i] = 0; this.pw[i] = 0; this.senesce[i] = 0; this.made[i] = 0;
@@ -445,6 +488,7 @@ var World = class World {
     }
     return { plants: this.plants.length, alivePlants: alive, plantCells: cells,
              leafCells: leaf, rootCells: root, stemCells: stem, liveTips: tips,
+             storeCells: this.plants.reduce((a, p) => a + p.counts[CELL.STORE], 0),
              maxHeight: height, cellDeaths: this.cellDeaths,
              execFraction: this.tipTicks ? this.tipExecs / this.tipTicks : 0 };
   }

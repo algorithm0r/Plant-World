@@ -115,6 +115,13 @@ var PARAMETERS = {
                           // Real leaf abscission is triggered by the leaf's own carbon
                           // balance at the light compensation point, which targets exactly
                           // the shaded tissue and leaves roots alone.
+  storeRelease: 0.12,     // storage LOADS at the full transport rate but UNLOADS at this
+                          // fraction of it. The asymmetry is the whole point: starch has to
+                          // be remobilised, which is slower than laying it down. It makes a
+                          // store a low-pass filter on the carbon budget — surplus is
+                          // sequestered instead of immediately funding growth, and deficit
+                          // is met from reserve instead of pushing every cell into debt at
+                          // once. That is the candidate fix for the overshoot instability.
   cellDebtLimit: 0.06,    // a cell may run a sugar deficit this deep before it dies. Newly
                           // built cells start empty and are fed by transport; without some
                           // tolerance every cell dies the tick after it is built. It also

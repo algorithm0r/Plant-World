@@ -30,6 +30,7 @@ var Observer = class Observer {
       '#7a5a34', // STEM
       '#3fbf5f', // LEAF
       '#e0d060', // SEED
+      '#d8b8e8', // STORE (cataphyll / bulb scale)
     ];
   }
 
@@ -57,6 +58,7 @@ var Observer = class Observer {
           else if (t === CELL.STEM) col = '#7a5a34';
           else if (t === CELL.SEED) col = '#e0d060';
           else if (t === CELL.ROOT) col = '#b98a4a';
+          else if (t === CELL.STORE) col = '#d8b8e8';
           else col = this.wetPal[clamp(Math.round(w.moisture[i] * last), 0, last)];
         }
         ctx.fillStyle = col;
