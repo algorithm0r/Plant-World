@@ -5,33 +5,37 @@
 **Verified:** never — no cold audit (`/audit`) has run yet; treat State as unverified
 
 ## Stage
-DEVPLAN **Stage 3 — Couple growth to the economy**  `[ ACTIVE ]`.
-Five of six items done and all five acceptance criteria met, but **storage organs** is still
-unticked — and it is the candidate fix for the overshoot instability, so the stage is not
-finished. Stage 4 (reproduction + inheritance, incl. the mutation operators) follows.
+DEVPLAN **Stage 4 — Reproduction and inheritance**  `[ ACTIVE ]`.
+Four of five items done; **clonal reproduction is implemented but not yet observed**.
+Stage 3 closed with storage built (it did not fix the overshoot — see MODEL.md).
 
 ## State
-**Stages 1-3 run, in-browser and headless — `smoketest.mjs` 28/28 PASS @ 2026-08-28.**
+**Stages 1-4 run, in-browser and headless — `smoketest.mjs` 33/33 PASS @ 2026-08-28.**
+Browser demo sows the founder `GL@@@@@@!GLF*`; ~15 s of watching gives 57 plants, 119 born,
+70 died, 48 seeds banked.
 
 *Environment:* heterogeneous terrain; two water sources (table + episodic rain); field
-capacity; moisture-dependent conductivity; wilting-point-scaled uptake; graded light.
+capacity; moisture-dependent conductivity; wilting-point uptake; graded light.
 
-*Genome:* `G R S L B F ! @ *` per tip. Germination gives two tips (up + down) reading one
-genome; positional cell fate makes shoot above / root below with no extra symbols.
+*Genome:* `G R S L B F ! @ *` per tip; two tips per germination; positional cell fate.
 
-*Economy:* two per-cell pools; photosynthesis requires water; transpiration drains leaves
-whether growing or not; sub-stepped transport; per-cell maintenance with a genome-length
-surcharge; growth gated on the tip being able to pay. **2.1% of tip-ticks execute** — the
-economy is the halting condition, not the clock.
+*Economy:* two per-cell pools; photosynthesis requires water; transpiration; sub-stepped
+transport; per-cell maintenance with a genome-length surcharge; storage (`L` below ground
+builds a cataphyll that loads fast and unloads slowly); local leaf senescence; structural
+support, so cut-loose tissue falls.
 
-**Emergent and verified:** self-pruning with crown rise — the lowest living leaf rises 2 → 7
-as shaded leaves fall below their own compensation point, 17 cells shed, 9 roots retained,
-with no rule saying prune. Also: near the table 43 cells vs 41 far from it; `*` meristems halt
-on the economy (oldest live tip 2400 steps vs a 4000 backstop).
+*Reproduction:* `F` mutates the parent germline, disperses it by a local exponential kernel
+into a seed bank with dormancy, and germinates onto bare surface. Mutation is point, indel,
+`@`-run slippage and tandem duplication.
+
+**Verified emergent:** a self-sustaining population with turnover — 8 founders → 90 plants,
+476 germinations, 394 deaths, 19 distinct genomes by t=20000, genome length stable at 13.4.
+**Weismann's barrier**, which nobody coded: `!` is per-tip and somatic, so tips held `GLF*`
+and `GL!GLF*` while the seed carried the full germline `GL@@@@@@!GLF*`.
 
 **Predicted failure mode, still recorded:** built straightforwardly this model gives a
-monoculture height race. Graded light, two water sources, gap-size-structured disturbance and
-local dispersal are structural requirements. Stage 5 ablates each.
+monoculture height race. Graded light, two water sources, gap-size disturbance and local
+dispersal are structural requirements. Stage 5 ablates each.
 
 ## Metrics
 - Environment @600 ticks, defaults: meanMoisture 0.297, shallow 0.367, deep 0.271,
@@ -51,11 +55,11 @@ local dispersal are structural requirements. Stage 5 ablates each.
   light (costed, deferred; day/night intensity rejected for v1); sensing/tropisms (Stage 6); continuous space.
 
 ## Next action
-Decide on **storage** before Stage 4. A pool that absorbs surplus rather than converting it
-straight into tissue, and is drawn down during deficit, damps the overshoot oscillation — and
-is the same mechanism perennial overwintering, the seasonal storage effect and tuber/bulb
-propagules need. `L` underground (currently a no-op) is the natural home for it: real
-underground leaves are cataphylls, and a bulb is a stack of them.
+Close Stage 4 by getting **clonal reproduction** to actually happen, then Stage 5. Stem cells
+only die from starvation, and a starving plant rarely leaves a fragment that is both anchored
+and viable — whereas real stolon disconnection is programmed, not a starvation event.
+Candidate: make `S`-forced tissue ephemeral, since a stolon is an ephemeral connector by
+definition and `S` already exists.
 
 ## Blockers
 - **Overshoot instability (blocks Stage 5).** Tips commit to cells on a local bank with no

@@ -20,7 +20,7 @@ var DataManager = class DataManager {
       const m = this.world.allMetrics();
       m.tick = engine.tick;
       this.samples.push(m);
-      if (this.graph) this.graph.push(m.meanMoisture);
+      if (this.graph) this.graph.push(m.plants);
     }
     if (!this.flushed && engine.tick >= PARAMETERS.epoch) {
       this.flushed = true;

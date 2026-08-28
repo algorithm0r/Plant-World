@@ -13,18 +13,32 @@ function reset() {
     const x = Math.floor((k + 0.5) * world.W / PARAMETERS.nSeeds);
     world.plantSeed(PARAMETERS.genome, x);
   }
-  const graph = new LineGraph(10, 10, 200, 80, 'mean soil moisture');
+  const graph = new LineGraph(10, 10, 220, 80, 'live plants');
   db = createDB(PARAMETERS.db);
   dataManager = new DataManager(world, db, graph);
   gameEngine.add(world);
   gameEngine.add(new Observer(world));
   gameEngine.add(dataManager);
   gameEngine.add(graph);
-  if (typeof setStatus === 'function') {
-    setStatus('Stage 2 — genome "' + PARAMETERS.genome + '", ' + PARAMETERS.nSeeds +
-      ' seed(s). ' + world.W + '×' + world.H + ' cells, table at row ' + world.tableY +
-      '. No economy yet: every tip runs one instruction per tick.');
-  }
+  refreshStatus();
+}
+
+// The status line has to update as the run proceeds — a line written once at reset is stale
+// within seconds, and was still claiming "Stage 2, no economy yet" long after Stage 4.
+function refreshStatus() {
+  if (typeof setStatus !== 'function' || !world) return;
+  const m = world.allMetrics();
+  setStatus(
+    't=' + gameEngine.tick +
+    '  founder "' + PARAMETERS.genome + '"' +
+    '\nplants ' + m.plants + ' (' + m.alivePlants + ' alive)' +
+    '   born ' + m.births + '   died ' + m.plantDeaths + '   banked ' + m.seedBank +
+    '\ncells ' + m.plantCells + '  (leaf ' + m.leafCells + ', root ' + m.rootCells +
+    ', stem ' + m.stemCells + ', store ' + m.storeCells + ')' +
+    '\ntallest ' + m.maxHeight + '   shed ' + m.cellDeaths + '   clonal splits ' + m.clonalSplits +
+    '\nmean genome ' + m.meanGenomeLen.toFixed(1) + ' symbols' +
+    '   tips executing ' + (100 * m.execFraction).toFixed(1) + '%'
+  );
 }
 
 window.onload = function () {
@@ -34,4 +48,5 @@ window.onload = function () {
   buildControls();
   reset();
   gameEngine.start();
+  setInterval(refreshStatus, 400);
 };

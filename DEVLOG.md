@@ -3,6 +3,51 @@ Newest entry on top. **Append only — never edit past entries.**
 
 <!-- append new entries above this line -->
 
+## 2026-08-28 — Stage 4: reproduction, inheritance, and a self-sustaining population
+**Done:** `F` now mutates the parent germline, disperses it by a local exponential kernel into
+a seed bank with dormancy and a lifespan, and germinates onto bare surface. Mutation operators:
+point substitution, indel, **`@`-run slippage** (the microsatellite analogue that keeps repeat
+number a smooth quantitative trait) and **tandem duplication** of a random substring (how real
+genomes build modules). `prune()` extended so a cut-loose fragment that still touches ground
+becomes an independent ramet rather than falling. Plants with no tissue are retired.
+**Chris's reframe was right and it is the headline: population turnover works even though
+individual plants do not stabilise.** From 8 founders of `GL@@@@@@!GLF*`: 90 plants alive, 476
+germinations, 394 plant deaths, 131 seeds banked, 19 distinct genomes by t=20000, with mean
+genome length stable at 13.4 (no bloat). Individual plants still boom and bust; the population
+does not care, because fitness is seeds set before the crash. The overshoot that blocked Stage
+5 may be a life-history rather than a defect.
+**Weismann's barrier verified exactly, and nobody coded it.** It falls out of `!` being
+per-tip. With mutation off, germline `GL@@@@@@!GLF*`, the two tips held `GLF*` and `GL!GLF*`
+(differently truncated, because they are at different points in their own working copies), and
+the seed carried the full untruncated germline. The `lamarckian` switch flips the seed to
+`GLF*`, the parent tip's working copy — a one-line experimental condition.
+**Guarded against an obvious exploit:** `seedProvision` < 1, so a seed always carries less
+sugar than `F` costs. Without that, reproduction is an energy source and selection finds it
+immediately.
+**Not done: clonal reproduction is implemented but never observed.** Stem cells die only from
+starvation, and by the time a stem starves the whole plant is collapsing, so the fragment is
+rarely both anchored and viable. Real stolon disconnection is *programmed* — the connector
+senesces once the daughter has rooted — not a starvation event. Candidate fix: make `S`-forced
+tissue ephemeral, since a stolon is an ephemeral connector by definition and `S` already
+exists. Recorded as `[~]` in the DEVPLAN rather than ticked.
+**Changed:** `world.js` (+seed bank, disperse, germinateBank, mutate, clonal splitting in
+prune, plant retirement, population metrics), `tip.js` (`F` disperses instead of placing a
+cell), `plant.js` (+seedsMade, age), `params.js` (Stage 4 block), `smoketest.mjs` (+4
+assertions, and trimmed: the suite had grown to ~5 minutes).
+**The browser demo was stale, and Chris caught it.** Everything above was verified headlessly
+while `index.html` was still sowing `genome: 'GL*'` — which has no `F`, so **nothing
+reproduced in the UI at all**. None of the population dynamics being reported were visible.
+The status line still read "Stage 2 ... No economy yet". Three further gaps: the seed bank
+was never drawn, so reproduction was invisible until a plant abruptly appeared; the graph
+tracked soil moisture rather than anything about plants; and at `updatesPerDraw: 1` the
+interesting behaviour (t>5000) was minutes of wall-clock away. Fixed: founder genome
+`GL@@@@@@!GLF*`, `updatesPerDraw` 12, `epoch` 60000, seed-bank markers, a live multi-line
+status refreshed on a 400 ms interval, and the graph switched to live plant count. At ~15 s
+of watching: 57 plants, 119 born, 70 died, 48 banked. **Lesson: headless verification says
+nothing about the demo. Check the artifact the user actually looks at.**
+**Next:** get clonal reproduction to actually happen, then Stage 5 — disturbance, the
+water-source ablation, and diversity measured as modality rather than variance.
+
 ## 2026-08-28 — whole-plant death, structural support, storage organs
 **Done:** fixed the floating stems and leaves Chris saw. Two causes: (1) `plant.alive` was
 tied to HAVING TIPS, and `maintain()` skips dead plants, so a plant that stopped growing was

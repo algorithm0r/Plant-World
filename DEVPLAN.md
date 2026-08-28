@@ -137,18 +137,32 @@ seed provisioning is non-monotone (`GL*`: 43 cells at seedSugar 2.5, 0 at 6, 9 a
 and only 2 of 8 test genomes stay viable. Evolution needs a smoother landscape than that.
 Candidate fix is **storage**; it is a decision, not an oversight.
 
-## Stage 4 — Reproduction and inheritance  [ PLANNED ]
-- [ ] `F` propagules, **local** dispersal kernel, dormancy, germination
+## Stage 4 — Reproduction and inheritance  [ ACTIVE ]
+- [x] `F` propagules, **local** dispersal kernel (exponential), dormancy, seed bank, germination
 - [ ] Per-plant trait vector into the packet (height, width, root:shoot, leaf fraction,
       branch count, mean internode, genome length, clonal:sexual allocation, lifespan,
       realized fitness). **Store the vector, never a diversity scalar** — the measure will
       change and runs are expensive.
-- [ ] Graph disconnection on stem death → clonal individuals
-- [ ] Weismannian germline (seed carries the untruncated genome); Lamarckian switch
-- [ ] Mutation operators incl. `@`-run slippage and subtree duplication
+- [~] Graph disconnection on stem death → clonal individuals. **Implemented but not yet
+      observed.** A cut-loose fragment that still touches ground becomes an independent
+      ramet; one that does not, falls. But stem cells only die from starvation, and by the
+      time a stem starves the whole plant is usually collapsing, so the fragment is rarely
+      both anchored and viable. Real stolon disconnection is *programmed* — the connector
+      senesces deliberately once the daughter has rooted — not a starvation event. Candidate
+      fix: make `S`-forced tissue ephemeral (a stolon is an ephemeral connector by
+      definition), which uses the existing override rather than a new symbol.
+- [x] Weismannian germline (seed carries the untruncated genome); Lamarckian switch
+- [x] Mutation operators: point, indel, `@`-run slippage, tandem duplication
 **Done when:** a population sustains itself across generations from a single founder, both
 reproductive modes are observed, and the germline/soma split is verified by a genome diff
 between a heavily-truncated parent tip and its seed.
+
+**Status: two of three met.** A population sustains itself and turns over (8 founders → 90
+plants, 476 germinations, 394 plant deaths, 131 seeds banked by t=20000, 19 distinct genomes,
+mean genome length stable at 13.4). The germline/soma split is verified exactly: germline
+`GL@@@@@@!GLF*`, tips holding `GLF*` and `GL!GLF*` (differently truncated), seed carrying the
+full germline; the Lamarckian switch flips it to `GLF*`. **Clonal reproduction is not yet
+observed** — see the item above.
 
 ## Stage 5 — Evolution and diversity  [ PLANNED ]
 The actual experiment: *do standard coexistence mechanisms still generate niches when

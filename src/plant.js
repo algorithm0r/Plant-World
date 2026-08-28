@@ -21,6 +21,8 @@ var Plant = class Plant {
     this.counts = [0, 0, 0, 0, 0, 0, 0, 0];  // by CELL type
     this.dirty = false;        // a cell died this tick — support needs rechecking
     this.fallen = 0;           // cells lost to being cut loose rather than to starvation
+    this.seedsMade = 0;        // realized fitness
+    this.born = 0;             // tick of germination
     this.branches = 0;
     this.alive = true;
   }
@@ -41,6 +43,7 @@ var Plant = class Plant {
   }
 
   update(world) {
+    this.age = (this.age || 0) + 1;
     // a tip standing on a cell that starved goes with it (except the seed node itself,
     // which is bare ground until the first cell is built)
     for (const t of this.tips) {
@@ -85,6 +88,8 @@ var Plant = class Plant {
       seed: this.counts[CELL.SEED],
       store: this.counts[CELL.STORE],
       fallen: this.fallen,
+      seedsMade: this.seedsMade,
+      age: this.age || 0,
       height: Math.max(0, surf - top),        // cells above the local soil surface
       depth: Math.max(0, bottom - surf),      // cells below it
       width: this.cells.length ? right - left + 1 : 0,

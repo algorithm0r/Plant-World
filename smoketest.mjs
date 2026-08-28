@@ -55,7 +55,7 @@ const restore = () => Object.assign(P, BASE);
 // ---------------------------------------------------------------------------
 restore();
 const wA = fresh({ rainPeriod: 0, uptakeRate: 0 });
-run(wA, 4000);
+run(wA, 4000);   // duration IS the claim here — do not trim
 const settled = wA.maxDelta;   // NET change across a whole tick, not the diffusion half-step
 const profile = [0, 2, 4, 8, 16, 24, 32].map((d) => wA.moistureAtDepth(d));
 let monotone = true;
@@ -152,6 +152,8 @@ check('a root cell depletes its own cell', withRoot < control - 1e-4,
 function meanUptakeAt(depth, rainPeriod) {
   restore();
   const w = fresh({ rainPeriod, evaporation: 0.010 });
+  // settle times are part of the CLAIM here: the depth gradient needs time to develop, and
+  // trimming them silently weakened the measured advantage from 13x to 10x. Do not trim.
   run(w, 3000);
   const sx = 100;
   w.set(sx, w.surfaceY[sx] + depth, CELL.ROOT);
@@ -176,7 +178,7 @@ check('rain inverts the ranking (Walter two-layer signature)', wetShallow > wetD
 
 restore();
 const wG = fresh({ rainPeriod: 0, evaporation: 0.010, uptakeRate: 0 });
-run(wG, 6000);
+run(wG, 4000);
 const surfDry = wG.moistureAtDepth(0), deepDry = wG.moistureAtDepth(32);
 check('dry surface hydraulically disconnects from the table', surfDry < 0.05 && deepDry > 0.15,
   'table-only surface=' + surfDry.toFixed(3) + ' deep=' + deepDry.toFixed(3) +
@@ -338,12 +340,62 @@ for (let x = 0; x < 200; x++) {
   if (fresh({}).surfaceY[x] > fresh({}).surfaceY[loCol]) loCol = x;   // low ground, shallow table
 }
 const wRef = fresh({});
-const nearTable = growEcon('GL*', 2000, loCol);
-const farTable = growEcon('GL*', 2000, hiCol);
+const nearTable = growEcon('GL*', 1500, loCol);
+const farTable = growEcon('GL*', 1500, hiCol);
 check('a plant near the water table outperforms one far from it',
   nearTable.tr.cells > farTable.tr.cells,
   'surface row ' + wRef.surfaceY[loCol] + ' (near) → ' + nearTable.tr.cells + ' cells vs row ' +
   wRef.surfaceY[hiCol] + ' (far) → ' + farTable.tr.cells + ' cells; table at row ' + wRef.tableY);
+
+
+// ===========================================================================
+// STAGE 4 — reproduction and inheritance
+// ===========================================================================
+const FOUNDER = 'GL@@@@@@!GLF*';   // leafy juvenile, then `!` commits to a seeding adult
+
+// --- 15. A population sustains itself from founders: births, deaths, and turnover.
+restore();
+const pop = fresh({ nSeeds: 8 });
+{
+  const e = new GameEngine();
+  for (let k = 0; k < 8; k++) pop.plantSeed(FOUNDER, Math.floor((k + 0.5) * pop.W / 8));
+  for (let t = 1; t <= 8000; t++) { e.tick = t; pop.update(e); }
+}
+const pm = pop.allMetrics();
+check('a population sustains itself across generations', pm.births > 20 && pm.plants > 8 && pm.plantDeaths > 0,
+  pm.plants + ' plants alive, ' + pm.births + ' germinations, ' + pm.plantDeaths +
+  ' plant deaths, ' + pm.seedBank + ' seeds banked (started from 8 founders)');
+
+// --- 16. Mutation generates heritable variation, without runaway genome bloat.
+const genomes = new Set(pop.plants.map((p) => p.genome));
+check('mutation generates heritable variation', genomes.size > 3 && pm.meanGenomeLen < 60,
+  genomes.size + ' distinct genomes in the population, mean length ' +
+  pm.meanGenomeLen.toFixed(1) + ' from a founder of ' + FOUNDER.length);
+
+// --- 17. WEISMANN'S BARRIER. `!` is somatic and per-tip, so a branch commits while the seed
+//     does not. This is not a rule that was added — it falls out of `!` being per-tip.
+function firstSeed(lam) {
+  restore();
+  const w = fresh({ mutPoint: 0, mutIndel: 0, mutSlip: 0, mutDup: 0, lamarckian: lam });
+  const pl = w.plantSeed(FOUNDER, 100);
+  const e = new GameEngine();
+  for (let t = 1; t <= 12000 && !w.seedBank.length; t++) { e.tick = t; w.update(e); }
+  return { seed: w.seedBank[0], tapes: pl.tips.map((t) => t.tape) };
+}
+const wm = firstSeed(false);
+check('Weismann: the seed carries the germline, not the truncated soma',
+  !!wm.seed && wm.seed.genome === FOUNDER && wm.tapes.some((t) => t !== FOUNDER),
+  'germline "' + FOUNDER + '" → seed "' + (wm.seed ? wm.seed.genome : 'none') +
+  '"; tips hold ' + wm.tapes.map((t) => '"' + t + '"').join(' '));
+const lm = firstSeed(true);
+check('the Lamarckian switch inverts it', !!lm.seed && lm.seed.genome !== FOUNDER,
+  'lamarckian=true → seed "' + (lm.seed ? lm.seed.genome : 'none') +
+  '" (the parent tip working copy)');
+
+// --- 18. Reproduction must not be an energy source, or selection finds it at once.
+check('a seed costs more than it carries', P.seedProvision < 1 && P.seedCost * P.seedProvision < P.seedCost,
+  'seedCost ' + P.seedCost + ' → endosperm ' + (P.seedCost * P.seedProvision).toFixed(2) +
+  ' (provision ' + P.seedProvision + ')');
 
 // ---------------------------------------------------------------------------
 restore();

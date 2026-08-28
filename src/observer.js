@@ -65,6 +65,13 @@ var Observer = class Observer {
         ctx.fillRect(x * cs, y * cs, cs, cs);
       }
     }
+    // dispersed seeds waiting in the bank — otherwise reproduction is invisible until a
+    // plant suddenly appears
+    ctx.fillStyle = '#ffd24a';
+    for (const sd of w.seedBank) {
+      const y = w.surfaceY[sd.x];
+      ctx.fillRect(sd.x * cs, (y - 1) * cs, cs, cs);
+    }
     // growth tips, so it is visible where development is actually happening
     ctx.fillStyle = '#ff4fa3';
     for (const pl of w.plants) for (const tp of pl.tips) {

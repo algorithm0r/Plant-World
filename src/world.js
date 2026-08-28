@@ -60,6 +60,10 @@ var World = class World {
     this.cellDeaths = 0;
     this.mark = new Int32Array(this.n);    // reusable flood-fill marker for prune()
     this.markGen = 0;
+    this.seedBank = [];        // dispersed, ungerminated propagules
+    this.births = 0;           // germinations
+    this.clonalSplits = 0;     // fragments that became independent plants
+    this.plantDeaths = 0;
     this.plants = [];
     this.nextPlantId = 0;
     this.rng = makeRNG(PARAMETERS.seed);
@@ -94,8 +98,76 @@ var World = class World {
     plant.register(i, type);
   }
 
+  // --- reproduction ------------------------------------------------------
+
+  // A propagule leaves the parent and lands somewhere else. Local kernel: an exponential
+  // distance either side, so a plant seeds its own neighbourhood and inferior competitors
+  // keep refuges.
+  disperse(genome, x, endosperm) {
+    const P = PARAMETERS;
+    const d = Math.ceil(-Math.log(1 - this.rng()) * P.dispersalMean);
+    const nx = clamp(x + (this.rng() < 0.5 ? -d : d), 0, this.W - 1);
+    this.seedBank.push({ x: nx, genome: genome, sugar: endosperm, age: 0 });
+  }
+
+  // Seeds wait out dormancy, then germinate onto bare surface. A seed that never finds a
+  // site is lost when it outlives `seedLifespan`.
+  germinateBank() {
+    const P = PARAMETERS;
+    if (!this.seedBank.length) return;
+    const keep = [];
+    for (const sd of this.seedBank) {
+      sd.age++;
+      if (sd.age > P.seedLifespan) continue;                       // lost
+      if (sd.age < P.seedDormancy) { keep.push(sd); continue; }
+      if (this.plants.length >= P.maxPlants) { keep.push(sd); continue; }
+      const y = this.surfaceY[sd.x];
+      if (this.type[this.idx(sd.x, y)] >= CELL.ROOT) { keep.push(sd); continue; }  // site taken
+      this.plantSeed(sd.genome, sd.x, sd.sugar);
+      this.births++;
+    }
+    this.seedBank = keep;
+  }
+
+  // Mutation operators on a string genome. Point / indel are ordinary; the other two are the
+  // ones the encoding was chosen for. See MODEL.md.
+  mutate(g) {
+    const P = PARAMETERS, A = 'GRSLBF!@*';
+    let out = '';
+    for (let i = 0; i < g.length; i++)
+      out += (this.rng() < P.mutPoint) ? A[(this.rng() * A.length) | 0] : g[i];
+    // @-run slippage: expand or contract a unary repeat count by exactly one. Small mutation,
+    // small phenotypic step — the microsatellite analogue that makes repeat number smooth.
+    if (this.rng() < P.mutSlip) {
+      const runs = [];
+      for (let i = 0; i < out.length; i++) if (out[i] === '@') runs.push(i);
+      if (runs.length) {
+        const k = runs[(this.rng() * runs.length) | 0];
+        out = this.rng() < 0.5 ? out.slice(0, k) + out.slice(k + 1) : out.slice(0, k) + '@' + out.slice(k);
+      } else if (out.length) {
+        const k = (this.rng() * out.length) | 0;
+        out = out.slice(0, k) + '@' + out.slice(k);
+      }
+    }
+    if (this.rng() < P.mutIndel) {
+      const k = (this.rng() * Math.max(1, out.length)) | 0;
+      out = this.rng() < 0.5 && out.length > 1
+        ? out.slice(0, k) + out.slice(k + 1)
+        : out.slice(0, k) + A[(this.rng() * A.length) | 0] + out.slice(k);
+    }
+    // tandem duplication: copy a substring next to itself. This is how real genomes build
+    // modules, and it gives evolution literal raw material to diverge from.
+    if (this.rng() < P.mutDup && out.length > 1) {
+      const a = (this.rng() * out.length) | 0;
+      const b = Math.min(out.length, a + 1 + ((this.rng() * 6) | 0));
+      const seg = out.slice(a, b);
+      if (out.length + seg.length < 400) out = out.slice(0, b) + seg + out.slice(b);
+    }
+    return out.length ? out : 'G';
+  }
+
   // Germinate a plant at the surface of column x. Two tips, up and down.
-  plantSeed(genome, x) {
+  plantSeed(genome, x, endosperm) {
     const y = this.surfaceY[x];
     const pl = new Plant(this.nextPlantId++, genome, x, y);
     this.plants.push(pl);
@@ -103,7 +175,7 @@ var World = class World {
     // network and feeds the seedling until its first leaf earns. Tips start empty and draw
     // from it like any other node.
     this.place(x, y, CELL.SEED, pl);
-    this.ps[this.idx(x, y)] = PARAMETERS.seedSugar;
+    this.ps[this.idx(x, y)] = (endosperm === undefined) ? PARAMETERS.seedSugar : endosperm;
     this.pw[this.idx(x, y)] = PARAMETERS.seedWater;
     pl.germinate(this);
     return pl;
@@ -164,6 +236,11 @@ var World = class World {
     this.maintain();
     this.prune();
     for (const pl of this.plants) if (pl.alive) pl.update(this);
+    this.germinateBank();
+    // retire plants that have lost all tissue
+    const before = this.plants.length;
+    this.plants = this.plants.filter((pl) => pl.cells.length > 0);
+    this.plantDeaths += before - this.plants.length;
     // NET change across the whole tick. Measuring only the diffusion step would report a
     // steady flux forever, because diffusion and drainage balance rather than both stopping.
     let d = 0;
@@ -407,7 +484,42 @@ var World = class World {
           keep[j] = gen; stack.push(j);
         }
       }
-      for (const i of pl.cells.slice()) if (keep[i] !== gen) this.killCell(i, pl, true);
+      // Unreached tissue is cut loose. A fragment that still touches ground of its own is a
+      // CLONAL individual — a rhizome or stolon whose connecting stem died — so it becomes an
+      // independent plant. A fragment with no ground contact cannot hang in the air and falls.
+      const loose = pl.cells.filter((i) => keep[i] !== gen);
+      if (loose.length) {
+        const seen = new Set();
+        for (const start of loose) {
+          if (seen.has(start)) continue;
+          const comp = [start]; seen.add(start);
+          let anchored = false;
+          for (let qi = 0; qi < comp.length; qi++) {
+            const i = comp[qi];
+            const cx = i % this.W, cy = (i / this.W) | 0;
+            if (cy >= this.surfaceY[cx]) anchored = true;
+            for (const j of [i - 1, i + 1, i - this.W, i + this.W]) {
+              if (j < 0 || j >= this.n || seen.has(j)) continue;
+              if (this.owner[j] !== pl.id || this.type[j] < CELL.ROOT || keep[j] === gen) continue;
+              seen.add(j); comp.push(j);
+            }
+          }
+          if (anchored && comp.length >= PARAMETERS.minClone) {
+            const ramet = new Plant(this.nextPlantId++, pl.genome, comp[0] % this.W,
+                                    (comp[0] / this.W) | 0);
+            this.plants.push(ramet);
+            for (const i of comp) { this.owner[i] = ramet.id; ramet.register(i, this.type[i]); }
+            for (const t of pl.tips) if (this.owner[this.idx(t.x, t.y)] === ramet.id) {
+              t.plant = ramet; ramet.tips.push(t);
+            }
+            pl.tips = pl.tips.filter((t) => t.plant === pl);
+            ramet.alive = true;
+            this.clonalSplits++;
+          } else {
+            for (const i of comp) this.killCell(i, pl, true);
+          }
+        }
+      }
       pl.cells = pl.cells.filter((i) => this.owner[i] === pl.id);
     }
   }
@@ -489,6 +601,10 @@ var World = class World {
     return { plants: this.plants.length, alivePlants: alive, plantCells: cells,
              leafCells: leaf, rootCells: root, stemCells: stem, liveTips: tips,
              storeCells: this.plants.reduce((a, p) => a + p.counts[CELL.STORE], 0),
+             seedBank: this.seedBank.length, births: this.births,
+             clonalSplits: this.clonalSplits, plantDeaths: this.plantDeaths,
+             meanGenomeLen: this.plants.length
+               ? this.plants.reduce((a, p) => a + p.genome.length, 0) / this.plants.length : 0,
              maxHeight: height, cellDeaths: this.cellDeaths,
              execFraction: this.tipTicks ? this.tipExecs / this.tipTicks : 0 };
   }

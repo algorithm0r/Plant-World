@@ -191,12 +191,15 @@ var Tip = class Tip {
     this.k++;
   }
 
-  // Stage 4 wires reproduction. Stage 2 just marks the cell so it is visible.
+  // A propagule leaves the parent: it is mutated, dispersed by a local kernel, and waits in
+  // the seed bank. The seed carries the parent GERMLINE — the untruncated genome — not this
+  // tip's `!`-truncated working copy. `!` is somatic, so a branch commits while the seed does
+  // not: Weismann's barrier, for free, from a decision made for other reasons.
   propagule(world) {
-    const face = this.pickFace(world, lateralFaces(this.heading));
-    if (face < 0) return false;
-    const d = DIRS[face];
-    world.place(this.x + d.dx, this.y + d.dy, CELL.SEED, this.plant);
+    const P = PARAMETERS;
+    const source = P.lamarckian ? this.tape : this.plant.genome;
+    world.disperse(world.mutate(source), this.x, P.seedCost * P.seedProvision);
+    this.plant.seedsMade++;
     this.k++;
     return true;
   }

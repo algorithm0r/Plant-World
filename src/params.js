@@ -56,10 +56,12 @@ var PARAMETERS = {
                           // entire water niche and leaves depth nothing to pay for.
 
   // --- genome / tips (Stage 2) ---
-  genome: 'GL*',          // demo plant: leafy indeterminate axis. Viable under the
-                          // current economy. Most juvenile-phase genomes are NOT —
-                          // see the overshoot limitation in MODEL.md.
-  nSeeds: 3,              // seeds sown evenly across the width
+  genome: 'GL@@@@@@!GLF*',  // founder: a leafy juvenile axis (`GL` repeated by a unary `@`
+                          // run), then `!` commits the meristem to a seeding adult phase
+                          // repeated by `*`. It MUST contain `F` or nothing reproduces and
+                          // the run is a static demo. Try 'GL*' (no reproduction),
+                          // 'GG!SSSSSSL*' (rhizome), 'GGGGB*' (brancher).
+  nSeeds: 8,              // founder plants, sown evenly across the width
   deltaIndex: 1,          // face-selection rule for B and L. On a lattice headings are
                           // quantised, so delta picks WHICH free face to take next rather
                           // than a continuous divergence angle (MODEL.md).
@@ -98,7 +100,8 @@ var PARAMETERS = {
                           // design: a real plant transpires far more water than it ever
                           // builds into biomass, so growth is a sugar cost that merely
                           // requires water to be available, not a water cost.
-  seedCost: 1.20,         // sugar for one propagule — deliberately large
+  seedCost: 3.40,         // sugar for one propagule. Must exceed what the seed carries
+                          // (seedCost x seedProvision) or reproduction creates energy.
   tipDrawRate: 0.06,      // MAX a tip pulls from its node per tick. Several tips on one node
                           // compete for one node's bank; that is the whole point of tips
                           // being local accumulators.
@@ -134,16 +137,44 @@ var PARAMETERS = {
                           // independently of the economy, and it is the ablation Stage 5
                           // needs to show what the economy contributes.
 
+  // --- reproduction and inheritance (Stage 4) ---
+  seedProvision: 0.75,    // fraction of seedCost that reaches the seed as endosperm. MUST be
+                          // < 1: if a seed carried more sugar than it cost, `F` would be an
+                          // energy source and selection would find that immediately.
+  dispersalMean: 14,      // mean dispersal distance in cells; direction is +/- x. LOCAL by
+                          // design — a global kernel means the best competitor wins
+                          // everywhere and refuges stop existing (MODEL.md).
+  seedDormancy: 60,       // ticks a seed waits before it may germinate
+  seedLifespan: 4000,     // ticks after which an ungerminated seed is lost from the bank
+  minClone: 4,            // a cut-loose fragment smaller than this cannot make it as an
+                          // independent ramet and simply falls
+  maxPlants: 600,         // safety cap on simultaneous plants
+  lamarckian: false,      // false = the seed carries the parent GERMLINE (untruncated).
+                          // true = it carries the parent tip's `!`-truncated working copy.
+                          // A one-line experimental switch, not a redesign — see MODEL.md.
+
+  // --- mutation ---
+  mutPoint: 0.010,        // per-symbol substitution probability
+  mutIndel: 0.060,        // probability of one insertion or deletion per reproduction
+  mutSlip: 0.120,         // probability of expanding/contracting an `@` run by one. The
+                          // microsatellite analogue: unary counts make repeat number a
+                          // smooth quantitative trait (MODEL.md).
+  mutDup: 0.040,          // probability of a tandem duplication of a random substring —
+                          // how real genomes build modules, and the raw material for
+                          // divergence.
+
   // --- view ---
   view: 0,                // 0 = combined (sky = light, ground = moisture), 1 = light only,
                           // 2 = moisture only, 3 = cell type
 
   // --- engine ---
-  updatesPerDraw: 1,      // fast-forward: sim updates per rendered frame
+  updatesPerDraw: 12,     // fast-forward: sim updates per rendered frame. Population
+                          // dynamics live at t>5000, which is minutes of wall-clock at 1.
 
   // --- data collection ---
   reportingPeriod: 25,    // sample metrics every N ticks
-  epoch: 1500,            // a run ends (and ships a packet) at N ticks
+  epoch: 60000,           // a run ends (and ships a packet) at N ticks. Long, because the
+                          // interesting behaviour (turnover, drift) is tens of thousands.
 
   // --- database (the standard vendored client, src/db.js) ---
   db: {
@@ -171,7 +202,11 @@ var PARAM_SCHEMA = [
   { key: 'tauLeaf', label: 'Leaf transmittance τ', min: 0.05, max: 0.95, step: 0.05 },
   { key: 'uptakeRate', label: 'Root uptake', min: 0, max: 0.1, step: 0.005 },
   { key: 'deltaIndex', label: 'delta (face select)', min: 1, max: 5, step: 1, resets: true },
-  { key: 'nSeeds', label: 'Seeds', min: 1, max: 12, step: 1, resets: true },
+  { key: 'nSeeds', label: 'Founders', min: 1, max: 40, step: 1, resets: true },
+  { key: 'dispersalMean', label: 'Dispersal distance', min: 1, max: 80, step: 1 },
+  { key: 'mutPoint', label: 'Point mutation', min: 0, max: 0.05, step: 0.002 },
+  { key: 'mutSlip', label: '@-run slippage', min: 0, max: 0.4, step: 0.02 },
+  { key: 'mutDup', label: 'Duplication', min: 0, max: 0.2, step: 0.01 },
   { key: 'photoRate', label: 'Photosynthesis', min: 0, max: 0.1, step: 0.005 },
   { key: 'transpiration', label: 'Transpiration', min: 0, max: 0.06, step: 0.002 },
   { key: 'maintenance', label: 'Maintenance', min: 0, max: 0.006, step: 0.0002 },
