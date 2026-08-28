@@ -18,7 +18,17 @@ var PARAMETERS = {
   terrainScale: 2.5,      // low-frequency undulations across the width
 
   // --- water source 1: the table (deep, reliable) ---
-  tableDepth: 0.88,       // water table top, as a fraction of grid height from the top
+  tableDepth: 0.67,       // water table top, as a fraction of grid height from the top.
+                          // MUST be within root reach or the deep layer does not exist for
+                          // any real plant. At 0.88 the table sat 41-57 rows below the
+                          // surface while `GL*` roots reach 14, so every plant lived purely
+                          // on rain and Walter's two-layer mechanism was inert — all the
+                          // deep-water measurements had used HAND-PLACED roots. At 0.64 the
+                          // At 0.67 the table is ~10 rows below low ground and ~26 below
+                          // high ground: reachable in the valleys, out of reach on the
+                          // ridges, which is exactly the split the niche needs — while still
+                          // leaving a real soil column to hold a depth gradient. (0.64 made
+                          // it reachable but left only 5 rows of soil, too thin to measure.)
   tableMoisture: 1.0,     // held constant — a Dirichlet source, never updated
   initialMoisture: 0.25,  // soil moisture at t=0 above the table
 
@@ -61,8 +71,12 @@ var PARAMETERS = {
                           // repeated by `*`, with `B` branching in the ADULT phase. It must
                           // contain `F` or nothing reproduces, and `B` or nothing branches —
                           // the previous founder had no `B` and produced only bare stalks.
-                          // Best performer of those tested (286 births / 12k ticks vs 158 for
-                          // the unbranched version). Try 'GL*' (no reproduction),
+                          // Chosen so branching is VISIBLE, not because it is fittest: a
+                          // controlled test puts unbranched `GL@@@!GLF*` ahead (413 births vs
+                          // 286 over 12k ticks). `B` helps with a long juvenile phase and
+                          // hurts with a short one — see the epistasis table in MODEL.md.
+                          // Try 'GL@@@!GLF*' (fittest), 'GL@@@!GLF@@@' (annual: no `*`, so it
+                          // dies when its program ends), 'GL*' (no reproduction),
                           // 'GG!SSSSSSL*' (rhizome), 'GL@@@@@B@!GLF*' (branch mid-juvenile).
   nSeeds: 8,              // founder plants, sown evenly across the width
   deltaIndex: 1,          // face-selection rule for B and L. On a lattice headings are
@@ -156,6 +170,21 @@ var PARAMETERS = {
                           // true = it carries the parent tip's `!`-truncated working copy.
                           // A one-line experimental switch, not a redesign — see MODEL.md.
 
+  // --- plant death ---
+  // Until now a plant died ONLY by starving cell-by-cell to nothing. Two mechanisms were
+  // missing, and both were already flagged as open (monocarpic senescence in MODEL.md,
+  // random mortality as a Stage 5 disturbance knob).
+  plantMortality: 0.00006, // per plant per tick, density-INDEPENDENT background mortality.
+                          // This is the disturbance that opens gaps; without it the only way
+                          // to free space is for a plant to starve, which is
+                          // density-dependent and so cannot create the gaps a pioneer needs.
+  plantSenescence: 500,   // ticks a plant survives after its program ENDS (all tips gone).
+                          // A determinate genome — one with no `*` — finishes its tape and is
+                          // then a completed adult that cannot grow or reproduce further.
+                          // Monocarpic plants die after fruiting; this is that, and it is
+                          // what completes the annual/perennial axis. A `*` meristem never
+                          // runs out of tape, so perennials are simply not subject to it.
+
   // --- mutation ---
   mutPoint: 0.010,        // per-symbol substitution probability
   mutIndel: 0.060,        // probability of one insertion or deletion per reproduction
@@ -207,6 +236,8 @@ var PARAM_SCHEMA = [
   { key: 'deltaIndex', label: 'delta (face select)', min: 1, max: 5, step: 1, resets: true },
   { key: 'nSeeds', label: 'Founders', min: 1, max: 40, step: 1, resets: true },
   { key: 'dispersalMean', label: 'Dispersal distance', min: 1, max: 80, step: 1 },
+  { key: 'plantMortality', label: 'Random mortality', min: 0, max: 0.001, step: 0.00002 },
+  { key: 'plantSenescence', label: 'Senescence (ticks)', min: 50, max: 4000, step: 50 },
   { key: 'mutPoint', label: 'Point mutation', min: 0, max: 0.05, step: 0.002 },
   { key: 'mutSlip', label: '@-run slippage', min: 0, max: 0.4, step: 0.02 },
   { key: 'mutDup', label: 'Duplication', min: 0, max: 0.2, step: 0.01 },

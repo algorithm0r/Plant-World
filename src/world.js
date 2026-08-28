@@ -64,10 +64,16 @@ var World = class World {
     this.births = 0;           // germinations
     this.clonalSplits = 0;     // fragments that became independent plants
     this.plantDeaths = 0;
+    this.diedStarved = 0; this.diedRandom = 0; this.diedSenescent = 0;
     this.pcells = [];          // indices of all living plant cells, rebuilt once per tick
     this.plants = [];
     this.nextPlantId = 0;
-    this.rng = makeRNG(PARAMETERS.seed);
+    // TWO independent streams. Environment (terrain, rain) and biology (mortality, dispersal,
+    // mutation) must not share one, or adding a biological process shifts the weather —
+    // which is exactly what happened when plant mortality was added: it consumed draws every
+    // tick, changed the rain pattern, and silently reversed an unrelated water-table result.
+    this.rng = makeRNG(PARAMETERS.seed);              // environment only
+    this.rngBio = makeRNG(PARAMETERS.seed ^ 0x9e3779b9);  // biology only
     this.tick = 0;
     this.raining = false;
     this.lastRainTick = -1;
@@ -106,8 +112,8 @@ var World = class World {
   // keep refuges.
   disperse(genome, x, endosperm) {
     const P = PARAMETERS;
-    const d = Math.ceil(-Math.log(1 - this.rng()) * P.dispersalMean);
-    const nx = clamp(x + (this.rng() < 0.5 ? -d : d), 0, this.W - 1);
+    const d = Math.ceil(-Math.log(1 - this.rngBio()) * P.dispersalMean);
+    const nx = clamp(x + (this.rngBio() < 0.5 ? -d : d), 0, this.W - 1);
     this.seedBank.push({ x: nx, genome: genome, sugar: endosperm, age: 0 });
   }
 
@@ -130,37 +136,65 @@ var World = class World {
     this.seedBank = keep;
   }
 
+  // Plant-level death. Cell-by-cell starvation is not enough on its own: it is
+  // density-dependent, so it cannot open the gaps a pioneer strategy needs, and it never
+  // retires a completed determinate plant that is merely sitting there in balance.
+  mortality() {
+    const P = PARAMETERS;
+    for (const pl of this.plants) {
+      if (!pl.cells.length) continue;
+      if (P.plantMortality > 0 && this.rngBio() < P.plantMortality) {
+        this.killPlant(pl); this.diedRandom++; continue;
+      }
+      // the program is over: no live tips means the tape ran out everywhere. A determinate
+      // genome is a completed adult; monocarpic plants die after fruiting.
+      if (!pl.growing) {
+        if (++pl.senesceTicks > P.plantSenescence) { this.killPlant(pl); this.diedSenescent++; }
+      } else pl.senesceTicks = 0;
+    }
+  }
+
+  killPlant(pl) {
+    for (const t of pl.tips) if (!t.dead) t.die(this);
+    pl.tips = [];
+    for (const i of pl.cells.slice()) this.killCell(i, pl, false);
+    pl.cells = [];
+    pl.alive = false;
+    pl.growing = false;
+  }
+
   // Mutation operators on a string genome. Point / indel are ordinary; the other two are the
   // ones the encoding was chosen for. See MODEL.md.
   mutate(g) {
     const P = PARAMETERS, A = 'GRSLBF!@*';
+    const rnd = this.rngBio;
     let out = '';
     for (let i = 0; i < g.length; i++)
-      out += (this.rng() < P.mutPoint) ? A[(this.rng() * A.length) | 0] : g[i];
+      out += (rnd() < P.mutPoint) ? A[(rnd() * A.length) | 0] : g[i];
     // @-run slippage: expand or contract a unary repeat count by exactly one. Small mutation,
     // small phenotypic step — the microsatellite analogue that makes repeat number smooth.
-    if (this.rng() < P.mutSlip) {
+    if (rnd() < P.mutSlip) {
       const runs = [];
       for (let i = 0; i < out.length; i++) if (out[i] === '@') runs.push(i);
       if (runs.length) {
-        const k = runs[(this.rng() * runs.length) | 0];
-        out = this.rng() < 0.5 ? out.slice(0, k) + out.slice(k + 1) : out.slice(0, k) + '@' + out.slice(k);
+        const k = runs[(rnd() * runs.length) | 0];
+        out = rnd() < 0.5 ? out.slice(0, k) + out.slice(k + 1) : out.slice(0, k) + '@' + out.slice(k);
       } else if (out.length) {
-        const k = (this.rng() * out.length) | 0;
+        const k = (rnd() * out.length) | 0;
         out = out.slice(0, k) + '@' + out.slice(k);
       }
     }
-    if (this.rng() < P.mutIndel) {
-      const k = (this.rng() * Math.max(1, out.length)) | 0;
-      out = this.rng() < 0.5 && out.length > 1
+    if (rnd() < P.mutIndel) {
+      const k = (rnd() * Math.max(1, out.length)) | 0;
+      out = rnd() < 0.5 && out.length > 1
         ? out.slice(0, k) + out.slice(k + 1)
-        : out.slice(0, k) + A[(this.rng() * A.length) | 0] + out.slice(k);
+        : out.slice(0, k) + A[(rnd() * A.length) | 0] + out.slice(k);
     }
     // tandem duplication: copy a substring next to itself. This is how real genomes build
     // modules, and it gives evolution literal raw material to diverge from.
-    if (this.rng() < P.mutDup && out.length > 1) {
-      const a = (this.rng() * out.length) | 0;
-      const b = Math.min(out.length, a + 1 + ((this.rng() * 6) | 0));
+    if (rnd() < P.mutDup && out.length > 1) {
+      const a = (rnd() * out.length) | 0;
+      const b = Math.min(out.length, a + 1 + ((rnd() * 6) | 0));
       const seg = out.slice(a, b);
       if (out.length + seg.length < 400) out = out.slice(0, b) + seg + out.slice(b);
     }
@@ -238,11 +272,14 @@ var World = class World {
     this.maintain();
     this.prune();
     for (const pl of this.plants) if (pl.alive) pl.update(this);
+    this.mortality();
     this.germinateBank();
     // retire plants that have lost all tissue
     const before = this.plants.length;
     this.plants = this.plants.filter((pl) => pl.cells.length > 0);
-    this.plantDeaths += before - this.plants.length;
+    const gone = before - this.plants.length;
+    this.plantDeaths += gone;
+    this.diedStarved = this.plantDeaths - this.diedRandom - this.diedSenescent;
     // NET change across the whole tick. Measuring only the diffusion step would report a
     // steady flux forever, because diffusion and drainage balance rather than both stopping.
     let d = 0;
@@ -612,6 +649,8 @@ var World = class World {
              storeCells: this.plants.reduce((a, p) => a + p.counts[CELL.STORE], 0),
              seedBank: this.seedBank.length, births: this.births,
              clonalSplits: this.clonalSplits, plantDeaths: this.plantDeaths,
+             diedStarved: this.diedStarved, diedRandom: this.diedRandom,
+             diedSenescent: this.diedSenescent,
              meanGenomeLen: this.plants.length
                ? this.plants.reduce((a, p) => a + p.genome.length, 0) / this.plants.length : 0,
              maxHeight: height, cellDeaths: this.cellDeaths,

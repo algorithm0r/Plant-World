@@ -3,6 +3,60 @@ Newest entry on top. **Append only — never edit past entries.**
 
 <!-- append new entries above this line -->
 
+## 2026-08-28 — plant death, and: the two-layer mechanism had never been operating
+**The big one.** Chris asked why there was no branching; chasing that led to checking how deep
+roots actually grow, and: **roots reach ~14 rows while the water table sat 41-57 rows below
+the surface. No plant had ever reached it.** Every plant in every run has lived entirely on
+rain. The deep-rooted half of Walter's two-layer mechanism — described in MODEL.md as the
+strongest single source of niche structure in the model — was geometrically unreachable and
+did nothing. The Stage 1 measurements that appeared to demonstrate it (depth 30 outdrawing
+depth 2 by 90x; the ranking inverting with rain) used **hand-placed** roots: true statements
+about the soil, never statements about plants.
+The diagnostic was available since Stage 1 and never run: with rain off, plants died on low
+AND high ground at every tableDepth of 0.70 or deeper. If the deep layer mattered, low ground
+should have lived. Fixed with `tableDepth` 0.88 -> 0.67 (~10 rows below valleys, ~26 below
+ridges, 16-row soil column retained). Now: rain off, low ground 20 cells vs high ground 0;
+rain on, that same high-ground column 34 cells.
+**Withdrew the "ranking inverts with rain" claim.** It compared single roots at fixed depths
+and ignored the cost of REACHING depth. With a reachable table, deep simply wins (90x); the
+Stage 1 inversion was an artifact of the table being far enough away that a "deep" root was
+not near the source. Replaced by the partition stated at plant level, both halves asserted.
+**Also, this is the third instance today of one error shape:** testing components in isolation
+and asserting a property of their composition. The browser ran a genome with no `F` while
+population dynamics were reported; the demo genome had no `B` while branching was described;
+and the soil and the plants were each verified while the gap between them was not. The cheap
+general diagnostic is to remove a mechanism's only input and require the system to fail.
+**Plant death, per Chris.** Two mechanisms added, both previously flagged as open: **random
+background mortality** (density-INDEPENDENT, so it can open gaps — starvation is
+density-dependent and structurally cannot), and **monocarpic senescence** (a plant whose tips
+have all run off the tape is a completed adult and dies after `plantSenescence` ticks). The
+latter finally makes the annual/perennial axis do something, on one symbol: `GL@@@!GLF@@@`
+(no `*`) ends its program at t=2727 and dies; `GL@@@!GLF*` never ends and is alive with 55
+cells at t=12000. Death causes over 12k ticks: starved 184, random 25, senescent 4.
+**Split the RNG into two streams.** Adding mortality consumed draws every tick, shifted the
+rain pattern, and silently reversed an unrelated water-table result. `rng` is now environment
+only (terrain, rain) and `rngBio` biology only (mortality, dispersal, mutation). Without this
+every Stage 5 ablation would have been untrustworthy, since turning a mechanism off would also
+change the environment it was compared against.
+**Corrected an overclaim about the demo founder.** `GL@@@!GLBF*` was called "the best
+performer tested"; that came from comparing two genomes differing in two ways at once. The
+controlled test: `GL@@@!GLF*` (no branch) 413 births, `GL@@@!GLBF*` (branch) 286. The gain
+came from the shorter juvenile phase, not branching. Worse, `B` **flips sign** by context —
++136 births with a long juvenile phase, -127 with a short one. That is epistasis, and it is a
+better result than a uniform benefit: growth form and developmental timing must co-evolve.
+The founder keeps `B` for visibility, and MODEL.md now says so.
+**Also corrected the positional table.** The full sweep peaks at position 8 (immediately
+before the `!`), and every adult-phase position is worse than no branching at all. The earlier
+caption — "branching late splits an established plant that can afford it" — described adult
+behaviour that had not been measured, from a table whose every entry was juvenile.
+**Test-parameterisation fixes:** depth probes now derive from the actual soil thickness at the
+probe column instead of hard-coded rows that fell below the raised table and read as dry;
+single-plant behavioural tests disable random mortality, which was killing the subject
+mid-measurement; the water-table test no longer compares cell counts on 5-cell margins.
+**State:** `node smoketest.mjs` -> **33/33 PASS**.
+**Next:** apply the remove-the-input diagnostic to the other diversity mechanisms before
+Stage 5, which is built entirely on ablations.
+
 ## 2026-08-28 — Stage 4: reproduction, inheritance, and a self-sustaining population
 **Done:** `F` now mutates the parent germline, disperses it by a local exponential kernel into
 a seed bank with dormancy and a lifespan, and germinates onto bare surface. Mutation operators:

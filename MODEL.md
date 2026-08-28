@@ -123,11 +123,36 @@ the fix goes in the resource economy, not in the grammar. Applied throughout bel
   (rain only / table only / both) with the prediction that coexistence appears only in the
   third. Both are consumed by uptake, so competition is real.
 
-  **Measured, Stage 1: the ranking inverts between regimes.** Table only, a root at depth 30
-  outdraws one at depth 2 by ~90x (13x at the shorter smoketest settle). With rain, depth 2
-  outdraws depth 30. Two strategies, each best under a different water regime — the mechanism
-  is a demonstrated property of the environment, not an assumption, and two smoketest
-  assertions guard it.
+  **CORRECTION (2026-08-28). For most of this project the mechanism was inert, and the
+  measurements that appeared to demonstrate it were about the soil, not about plants.**
+
+  The Stage 1 numbers — a root at depth 30 outdrawing one at depth 2 by ~90x, the ranking
+  inverting with rain — used **hand-placed** roots. Real plants grow about 14 rows down, and
+  the table sat 41-57 rows below the surface. **No plant had ever reached the water table.**
+  Every plant in every run lived entirely on rain; the deep-rooted half of the partition was
+  geometrically unreachable, so the strongest niche axis in the design did nothing.
+
+  The tell was available from Stage 1 and never run: **with rain off, plants died on low and
+  high ground alike** at every table depth of 0.70 or deeper. Had the deep layer been doing
+  anything, low ground should have survived. The lesson is general — the soil physics was
+  right and the plant growth was right, and the failure lived at the join, invisible to tests
+  of either half.
+
+  Fixed by raising the table to `tableDepth` 0.67: ~10 rows below low ground (inside the root
+  envelope) and ~26 below high ground (outside it), while still leaving a 16-row soil column
+  to hold a depth gradient.
+
+  **The mechanism now demonstrably operates, and is asserted as a partition rather than a
+  ranking.** With rain off, a low-ground plant reaches 20 cells and a high-ground plant dies
+  outright (0). With rain on, that same high-ground column reaches 34 cells. The two sources
+  are complementary: each supports plants the other cannot.
+
+  **The "ranking inverts with rain" claim is withdrawn.** It compared single roots at fixed
+  depths and ignored the cost of *reaching* depth. With a reachable table, deep water simply
+  wins (90x), and no inversion occurs — the apparent inversion in Stage 1 was an artifact of
+  the table being far away, so that a "deep" root was not in fact near the source. The real
+  trade-off is plant-level: deep water is better, and getting there costs cells. A per-root
+  uptake comparison cannot see that, so it was never testing the mechanism.
 - **Light**: modelled, and **graded, not binary**. Sweep each column top-down accumulating
   transmittance: T starts at 1, each intervening leaf multiplies it by τ < 1 (stem lower).
   A leaf receives light ∝ T. Still O(width × height), one multiply instead of a flag.
@@ -462,6 +487,29 @@ deficit, damps exactly this oscillation. It is also what perennial overwintering
 storage effect, and tuber/bulb propagules need. Not yet implemented — this is a decision, not
 an oversight.
 
+## Plant death — four routes
+
+1. **Starvation**, cell by cell, when a cell cannot pay maintenance. Density-dependent, so it
+   frees space only where competition is already fierce — it cannot open a gap in an
+   uncrowded patch.
+2. **Loss of support** — tissue cut loose by a death below it falls (see *Death, support and
+   storage*).
+3. **Random background mortality** (`plantMortality`, per plant per tick). Density-INDEPENDENT,
+   which is exactly why it is needed: it is the disturbance that opens gaps for a pioneer
+   strategy, and starvation structurally cannot do that job.
+4. **Monocarpic senescence** (`plantSenescence`). A plant whose tips have all run off the tape
+   has completed its program; it survives a fixed span and then dies. Real monocarpic plants —
+   annuals, agave, bamboo — die after fruiting.
+
+Route 4 is what finally makes the **annual/perennial axis** do something, and it turns on a
+single symbol, as predicted. Measured: `GL@@@!GLF@@@` (no `*`) ends its program at t=2727 and
+dies — an annual. `GL@@@!GLF*` (with `*`) never ends its program and is still alive with 55
+cells at t=12000 — a perennial.
+
+Death causes over 12000 ticks with the demo founder: starved 184, random 25, senescent 4
+(senescent is low because the founder is perennial; only ramets and damaged plants lose all
+their tips).
+
 ## Disturbance and temporal structure
 
 A spectrum from emergent to exogenous. They do different jobs and should be separate knobs,
@@ -532,28 +580,54 @@ mechanisms make that possible here. All are cheap; none is optional if diversity
 4. **Local dispersal.** A global seed kernel means the best competitor wins everywhere. A
    local kernel leaves refuges, and dispersal distance becomes its own evolvable trade-off.
 
-### Measured: `B` has a smooth fitness gradient by POSITION
+### Measured: `B` is positional AND epistatic
 
-Inserting a single `B` at successive positions in the founder `GL@@@@@@!GLF*` (8000 ticks,
-8 founders, plants surviving):
+Inserting a single `B` at each position of the founder `GL@@@@@@!GLF*` (`!` at index 8),
+8 founders, 8000 ticks, surviving plants:
 
-| position | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 |
-|---|---|---|---|---|---|---|---|---|
-| plants | 19 | **0** | **0** | **0** | 4 | 19 | 27 | **43** |
+| pos | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | **8** | 9 | 10 | 11 | 12 | 13 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| plants | 19 | 0 | 0 | 0 | 4 | 19 | 27 | 43 | **53** | 34 | 33 | 30 | 27 | 39 |
 
-The same symbol is **lethal at positions 1-3 and beneficial at position 7**, and the gradient
-between them is smooth and monotone. Branching early splits a seedling's scarce resources
-before it can earn; branching late splits an established plant that can afford it. So position
-in the tape is a first-class fitness determinant, and — importantly for evolvability — the
-landscape over position is climbable rather than random.
+**Lethal at 1-3, peak at 8, then declining through the adult phase.** Position 8 is the last
+juvenile slot, immediately before the `!`. Position 13 puts `B` behind the `*` where it is
+unreachable dead code, so it is effectively the unbranched control — and at 39 it beats every
+adult-phase position (9-12). Branching *in the adult phase is worse than not branching at
+all*, while branching just before the phase switch is the best option available.
 
-This also explains why branching does not appear on its own quickly. Mutation *does* generate
-`B` (5 B-carrying seeds banked by t=20000 from a founder with none), but at
-`mutPoint` x length / |alphabet| ≈ 0.014 per seed, and most of the positions it lands in are
-lethal. Evolution finds it; it just needs either longer runs, a higher mutation rate, or a
-founder that already branches.
+The climb from 4 to 8 is smooth and monotone, which matters for evolvability: the landscape
+over position is walkable rather than random.
 
-### Why the encoding itself may favour distinct forms
+**And the effect of `B` flips sign depending on the rest of the genome.** Controlled, one
+variable at a time, 12000 ticks, seeds produced:
+
+| genome | branch? | births |
+|---|---|---|
+| `GL@@@@@@!GLF*` | no | 158 |
+| `GL@@@@@@B!GLF*` | yes | **294**  (+136) |
+| `GL@@@!GLF*` | no | **413** |
+| `GL@@@!GLBF*` | yes | 286  (-127) |
+
+With a long juvenile phase `B` helps; with a short one it hurts. So there is no context-free
+answer to "is branching good" — this is **epistasis**, and it is a more useful property than a
+uniform benefit would be, because it means growth form and developmental timing have to
+co-evolve rather than being independently optimisable.
+
+**The best genome tested has no branching at all** (`GL@@@!GLF*`, 413 births). The demo
+founder is `GL@@@!GLBF*`, chosen so that branching is *visible* in the browser — not because
+it is fittest. An earlier version of this document claimed it was the best performer; that
+came from comparing two genomes that differed in two ways at once, and attributing the gain to
+the wrong one.
+
+### Mutation does find `B`, slowly
+
+From a founder containing none, mutation had produced 5 B-carrying seeds in the bank by
+t=20000 (476 births), and none had established. At `mutPoint` x length / |alphabet| ~ 0.014
+per seed, and with most positions lethal or neutral-to-harmful, that is the expected rate.
+Evolution finds branching; it needs longer runs, a higher mutation rate, or a founder that
+already has it.
+
+### Why the encoding itself may favour distinct forms### Why the encoding itself may favour distinct forms
 
 The mutational landscape is **anisotropic**. `@`-runs mutate in unary, so size and segment
 number vary continuously. But `B` and `*` are single symbols with enormous phenotypic

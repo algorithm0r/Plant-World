@@ -23,6 +23,7 @@ var Plant = class Plant {
     this.fallen = 0;           // cells lost to being cut loose rather than to starvation
     this.seedsMade = 0;        // realized fitness
     this.born = 0;             // tick of germination
+    this.senesceTicks = 0;     // ticks since the program ended (all tips gone)
     this.branches = 0;
     this.alive = true;
   }

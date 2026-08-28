@@ -57,14 +57,19 @@ restore();
 const wA = fresh({ rainPeriod: 0, uptakeRate: 0 });
 run(wA, 4000);   // duration IS the claim here — do not trim
 const settled = wA.maxDelta;   // NET change across a whole tick, not the diffusion half-step
-const profile = [0, 2, 4, 8, 16, 24, 32].map((d) => wA.moistureAtDepth(d));
+// depths derived from the soil column, not hard-coded: at a shallower tableDepth the old
+// fixed depths (24, 32) fell BELOW the table and read as 0, breaking a test that was fine.
+const soilRows = wA.tableY - wA.surfaceY[100];   // the column the probes actually use
+const depths = [0, 1, 2, 3, 4, 5].map((k) => Math.floor(k * (soilRows - 1) / 5));
+const profile = depths.map((d) => wA.moistureAtDepth(d));
 let monotone = true;
 for (let k = 1; k < profile.length; k++) if (profile[k] < profile[k - 1] - 1e-3) monotone = false;
 
 check('field converges (no rain, no uptake)', settled < 1e-5,
   'maxΔ/tick=' + settled.toExponential(2) + ' after 4000 ticks');
 check('moisture increases monotonically with depth', monotone,
-  'depths 0,2,4,8,16,24,32 → ' + profile.map((v) => v.toFixed(3)).join(' '));
+  'depths ' + depths.join(',') + ' (soil is ' + soilRows + ' rows) → ' +
+  profile.map((v) => v.toFixed(3)).join(' '));
 
 // ---------------------------------------------------------------------------
 // 2. Light is GRADED, not binary — the decision the understory niche depends on.
@@ -165,23 +170,22 @@ function meanUptakeAt(depth, rainPeriod) {
 // capture the base rain period FIRST — each call mutates P, so reading P.rainPeriod as a
 // later argument would pick up whatever the previous call left behind (it left 0).
 const RAIN = BASE.rainPeriod;
-const dryShallow = meanUptakeAt(2, 0).uptake;
-const dryDeep = meanUptakeAt(30, 0).uptake;
-const wetShallow = meanUptakeAt(2, RAIN).uptake;
-const wetDeep = meanUptakeAt(30, RAIN).uptake;
+const probe = fresh({});
+const DEEP = Math.max(4, probe.tableY - probe.surfaceY[100] - 1);
+const dryShallow = meanUptakeAt(1, 0).uptake;
+const dryDeep = meanUptakeAt(DEEP, 0).uptake;
+const wetShallow = meanUptakeAt(1, RAIN).uptake;
+const wetDeep = meanUptakeAt(DEEP, RAIN).uptake;
 
 check('depth pays when the table is the only source', dryDeep > dryShallow * 10,
-  'depth2=' + dryShallow.toExponential(1) + ' vs depth30=' + dryDeep.toExponential(1) +
+  'depth1=' + dryShallow.toExponential(1) + ' vs depth' + DEEP + '=' + dryDeep.toExponential(1) +
   '  (' + (dryDeep / dryShallow).toFixed(0) + '× — a step-function uptake gives 1×)');
-check('rain inverts the ranking (Walter two-layer signature)', wetShallow > wetDeep,
-  'with rain: depth2=' + wetShallow.toExponential(1) + ' > depth30=' + wetDeep.toExponential(1));
-
 restore();
 const wG = fresh({ rainPeriod: 0, evaporation: 0.010, uptakeRate: 0 });
 run(wG, 4000);
-const surfDry = wG.moistureAtDepth(0), deepDry = wG.moistureAtDepth(32);
+const surfDry = wG.moistureAtDepth(0), deepDry = wG.moistureAtDepth(DEEP);
 check('dry surface hydraulically disconnects from the table', surfDry < 0.05 && deepDry > 0.15,
-  'table-only surface=' + surfDry.toFixed(3) + ' deep=' + deepDry.toFixed(3) +
+  'table-only surface=' + surfDry.toFixed(3) + ' deep(' + DEEP + ')=' + deepDry.toFixed(3) +
   '  ratio=' + (surfDry / deepDry).toFixed(3) + '  (constant conductivity gives ~0.26)');
 
 
@@ -273,7 +277,8 @@ check('zoo: morphologies are reproducible from a fixed seed', reproducible,
 // ===========================================================================
 function growEcon(genome, ticks, col, over) {
   restore();
-  const w = fresh(Object.assign({ economyOff: false }, over || {}));
+  // random mortality is not under test here and killed the subject mid-measurement
+  const w = fresh(Object.assign({ economyOff: false, plantMortality: 0 }, over || {}));
   const pl = w.plantSeed(genome, col === undefined ? 100 : col);
   const e = new GameEngine();
   const track = [];
@@ -332,21 +337,33 @@ check('self-pruning: shaded leaves are shed, roots are spared',
   shedLeaves + ' cells shed, ' + eco.tr.root + ' roots and ' + eco.tr.leaf +
   ' leaves retained (a distance-based rule sheds roots first and kills the plant)');
 
-// --- 14. Water availability pays. The same genome on the lowest terrain (close to the
-//     table) must outperform it on the highest (far from it). Measured, not eyeballed.
-let hiCol = 0, loCol = 0;
-for (let x = 0; x < 200; x++) {
-  if (fresh({}).surfaceY[x] < fresh({}).surfaceY[hiCol]) hiCol = x;   // high ground, deep table
-  if (fresh({}).surfaceY[x] > fresh({}).surfaceY[loCol]) loCol = x;   // low ground, shallow table
-}
-const wRef = fresh({});
-const nearTable = growEcon('GL*', 1500, loCol);
-const farTable = growEcon('GL*', 1500, hiCol);
-check('a plant near the water table outperforms one far from it',
-  nearTable.tr.cells > farTable.tr.cells,
-  'surface row ' + wRef.surfaceY[loCol] + ' (near) → ' + nearTable.tr.cells + ' cells vs row ' +
-  wRef.surfaceY[hiCol] + ' (far) → ' + farTable.tr.cells + ' cells; table at row ' + wRef.tableY);
-
+// --- 14. THE TWO-LAYER NICHE, tested where it is actually decisive: with rain OFF, so the
+//     table is the only water. Plants on low ground (table within root reach) must survive
+//     and plants on high ground must not.
+//     The previous version compared cell counts WITH rain and passed on 5-cell margins that
+//     were rain-patch noise — and it was never testing the table at all, because at the old
+//     tableDepth the table sat 41-57 rows down while roots reach 14. No plant had ever
+//     reached the water table.
+const surf0 = fresh({}).surfaceY;
+const lowCol = surf0.indexOf(Math.max.apply(null, Array.from(surf0)));   // low ground, near table
+const highCol = surf0.indexOf(Math.min.apply(null, Array.from(surf0)));  // high ground, far
+const dryNear = growEcon('GL*', 4000, lowCol, { rainPeriod: 0 }).tr.cells;
+const dryFar = growEcon('GL*', 4000, highCol, { rainPeriod: 0 }).tr.cells;
+// The mechanism is a partition: the table supports plants rain cannot, and rain supports
+// plants the table cannot. Both halves are asserted.
+// (An earlier assertion claimed the deep/shallow RANKING inverts with rain. It does not, and
+// it never tested the mechanism: it compared single roots at fixed depths and ignored the
+// cost of reaching depth. With a reachable table, deep water simply wins — the trade-off is
+// that getting there costs cells, which is a plant-level property, not a per-root one.)
+const wetFar = growEcon('GL*', 4000, highCol, {}).tr.cells;
+check('two-layer niche: only plants that can reach the table survive without rain',
+  dryNear > 10 && dryFar === 0,
+  'rain off — low ground (surface row ' + surf0[lowCol] + ', table ' +
+  (fresh({}).tableY - surf0[lowCol]) + ' rows down) = ' + dryNear + ' cells; high ground (row ' +
+  surf0[highCol] + ', table ' + (fresh({}).tableY - surf0[highCol]) + ' rows down) = ' + dryFar);
+check('two-layer niche: rain supports the plants the table cannot reach', wetFar > 10,
+  'same high-ground column with rain on = ' + wetFar + ' cells (vs ' + dryFar +
+  ' without) — the two sources are complementary, which is the mechanism');
 
 // ===========================================================================
 // STAGE 4 — reproduction and inheritance
@@ -367,10 +384,14 @@ check('a population sustains itself across generations', pm.births > 20 && pm.pl
   ' plant deaths, ' + pm.seedBank + ' seeds banked (started from 8 founders)');
 
 // --- 16. Mutation generates heritable variation, without runaway genome bloat.
+// count standing plants AND banked seeds: both are real offspring, and the bank holds
+// variants that have not had a germination site yet
 const genomes = new Set(pop.plants.map((p) => p.genome));
-check('mutation generates heritable variation', genomes.size > 3 && pm.meanGenomeLen < 60,
-  genomes.size + ' distinct genomes in the population, mean length ' +
-  pm.meanGenomeLen.toFixed(1) + ' from a founder of ' + FOUNDER.length);
+const allG = new Set([...genomes, ...pop.seedBank.map((sd) => sd.genome)]);
+check('mutation generates heritable variation', allG.size > 3 && pm.meanGenomeLen < 60,
+  allG.size + ' distinct genomes (' + genomes.size + ' standing, ' + pop.seedBank.length +
+  ' seeds banked) from one founder of ' + FOUNDER.length +
+  '; mean length ' + pm.meanGenomeLen.toFixed(1) + ' (no bloat)');
 
 // --- 17. WEISMANN'S BARRIER. `!` is somatic and per-tip, so a branch commits while the seed
 //     does not. This is not a rule that was added — it falls out of `!` being per-tip.
