@@ -68,6 +68,44 @@ the fix goes in the resource economy, not in the grammar. Applied throughout bel
     a root at m=0.02 perform identically to one at m=1.0, which flattens the water niche
     entirely (measured: depth 1 and depth 32 both returned exactly 0.0200/tick).
 
+  **What the moisture profile actually is — measured, because the intuitive reading is wrong.**
+  It is tempting to describe this as gravity pulling water down, diffusion carrying it up, and
+  the two balancing into an emergent water level. All three parts of that are off:
+  - **Diffusion is isotropic**, not upward. It moves water from wet to dry in every direction;
+    the net flux is upward only because the source sits at the bottom.
+  - **The table level is imposed, not emergent.** It is a Dirichlet boundary pinned at
+    moisture 1.0 and never updated. What is emergent is the *profile above it*.
+  - **There is no static equilibrium.** At steady state water is still moving: net upward flux
+    0.0139 across a cut 20 rows above the table, with no downward component there (everything
+    is below field capacity, so drainage is inactive). It is a steady **throughflow** —
+    table → soil → atmosphere. With no sink at all there is no level, only slow saturation
+    (mean 0.250 → 0.267 → 0.335 at 2k / 20k / 80k ticks, still climbing).
+
+  What does set the profile:
+  - **Gravity does most of the shaping.** drainage=0 gives 0.929 at depth 40; drainage=0.2
+    gives 0.341. Strongly sensitive.
+  - **A sink is necessary, but its rate barely matters.** A 15x change in evaporation
+    (0.002 → 0.030) moves only the top cell (0.034 → 0.002); depth 1 downward is identical to
+    three decimals. Transport is **conductivity-limited** — K(m)=m² at m≈0.1 is 0.01, so the
+    dry layer is nearly an insulator and the sink can only take what the soil delivers. Any
+    sink strong enough to hold the surface near zero yields the same profile. This is a
+    robustness property: profile shape is set by soil physics, not by sink strength.
+
+  **Known limitation.** Real soil above a water table reaches a genuine static equilibrium
+  where gravity balances matric suction at zero net flux. This model cannot: its transport is
+  concentration-gradient diffusion, not matric potential, so below field capacity nothing
+  opposes it and the profile drifts toward saturation whenever sinks are weak. Field capacity
+  + drainage is the standard ecohydrology **bucket approximation** — defensible, but it means
+  the environment has a slow drift rather than a resting state. Irrelevant at run length
+  (1500 ticks vs ~100k for the drift, with plants transpiring throughout); worth knowing
+  before any long unattended run.
+
+  **Why the table stays pinned.** A finite aquifer that recharged from rain and depleted from
+  uptake would make the level emergent and add drawdown/drought-year dynamics. Deliberately
+  not done: the two-layer mechanism requires the deep source to be **reliable**, and a table
+  that moved with rainfall would couple the deep layer to the shallow one and blur exactly
+  the distinction that generates the niche. Temporal variability comes from rain instead.
+
   **Verified: a sink genuinely draws from the table.** With rain and evaporation off, soil
   water stays flat while uptake continues indefinitely — the table resupplies through the
   gradient. A dense root mat is supply-limited (640 roots got 2% of their demand), so

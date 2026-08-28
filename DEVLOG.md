@@ -3,6 +3,28 @@ Newest entry on top. **Append only — never edit past entries.**
 
 <!-- append new entries above this line -->
 
+## 2026-08-28 — characterised the moisture profile: throughflow, not a force balance
+**Done:** tested what actually sets the soil moisture profile, prompted by the question of
+whether gravity-down plus diffusion-up produces an emergent water level. It does not, in
+three separate ways, all measured. (a) With NO sink the soil has no level at all, just slow
+saturation — 0.250/0.267/0.335 at 2k/20k/80k ticks, still climbing, because below field
+capacity nothing opposes diffusion. (b) The profile is nearly insensitive to sink RATE: a 15x
+change in evaporation moves only the top cell (0.034 → 0.002), everything from depth 1 down
+identical to three decimals, because transport is conductivity-limited (K(m)=m² at m≈0.1 is
+0.01, so the dry layer is almost an insulator). (c) It IS strongly sensitive to gravity:
+drainage 0 → 0.929 at depth 40, drainage 0.2 → 0.341. And at steady state water is still
+moving — net upward flux 0.0139 across a cut 20 rows above the table, no downward component.
+So it is a steady throughflow (table → soil → atmosphere), and the table LEVEL is an imposed
+Dirichlet boundary; only the profile above it is emergent.
+**Changed:** `MODEL.md` only — no code. Recorded the measurements, the bucket-approximation
+limitation (no static equilibrium; slow drift toward saturation absent sinks; ~100k ticks vs
+1500-tick runs), and the reason the table stays pinned rather than becoming a finite aquifer
+(the two-layer mechanism needs the deep source reliable; a table moving with rainfall would
+couple the layers and blur the niche).
+**State:** no code change; `node smoketest.mjs` still 12/12 PASS.
+**Next:** unchanged — Stage 2: `Tip`, the instruction set, the geometric branch cap, the
+genome zoo.
+
 ## 2026-08-28 — soil hydraulics: two flaws found by asking whether a sink draws from the table
 **Done:** answered the question by measurement rather than argument. A sink *does* draw from
 the table (soil water flat at ~3650 while uptake ran indefinitely; a 640-cell root mat was
