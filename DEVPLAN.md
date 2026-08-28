@@ -34,16 +34,16 @@ graded light, spatial heterogeneity, gaps and local dispersal structural require
 than refinements. Both are written up in `MODEL.md`.
 
 Nothing now blocks Stage 1. Remaining open items, none blocking:
-- [ ] δ: one float per genome or per branch point
+- [ ] δ: face-selection rule on a lattice (quantised) — how much of it is evolvable
+- [ ] Transpiration rate; gap size distribution; monocarpic senescence
+- [ ] Angled day-sweeping light (costed, deferred); day/night intensity (rejected for v1)
 - [ ] Calibrating "slower than the clock" — the numbers, not the rule (Stage 3's main job)
 - [ ] τ, per-leaf transmittance — sets how deep an understory can be
 - [ ] Cell death/decay and matter return; disturbance regime (random / patch / seasonal /
       emergent-only)
 - [ ] Collision rule (stall / die / grow through; self vs. other-plant)
-- [ ] Per-tip maintenance rate — sets sustainable meristem count and the apical-dominance
-      trade-off
-- [ ] Whether per-tip maintenance + local-pool allocation actually bound tip proliferation —
-      **check this early** with a `B *` genome; both are reasoned, neither demonstrated
+- [ ] Per-tip maintenance — out of v1; geometry caps branching, so this is an optional
+      apical-dominance refinement, not a safeguard
 - [ ] Environmental sensing / tropisms / a conditional symbol — the largest expressive gap,
       deliberately deferred (see Stage 6)
 - [ ] Continuous space — kept open by the δ design, not yet costed
@@ -55,8 +55,11 @@ Nothing now blocks Stage 1. Remaining open items, none blocking:
 ## Stage 1 — Grid + resource CA, no plants  [ ACTIVE ]
 Build and verify the environment alone, before any genome code exists.
 - [ ] Grid, cell types, soil/air layout in `world.js`; tunables into `params.js`
-- [ ] Moisture diffusion from the water table; uptake consumes it
+- [ ] **Two water sources**: a water table diffusing upward, and episodic rain wetting the
+      surface. Uptake consumes both. This is Walter's two-layer mechanism and it is the
+      strongest single source of niche structure in the model.
 - [ ] **Spatially heterogeneous** moisture/terrain — a required feature, not a later polish
+- [ ] Transpiration: leaf area drains water every tick, growing or not
 - [ ] **Graded** light: top-down transmittance sweep with per-leaf τ, not a binary shadow
 - [ ] Observer renders the grid (moisture and light fields both visible)
 - [ ] `datamanager` records a field statistic
@@ -67,9 +70,9 @@ asserts both numerically. No genome code anywhere yet.
 
 ## Stage 2 — Tips and the instruction set  [ PLANNED ]
 - [ ] `Tip`: position, heading, read head, per-tip working copy
-- [ ] **Tips draw from the local cell's pool, never a shared plant pool** — this is what
-      forecloses the proliferate-meristems exploit; get it right here, not later
-- [ ] Per-tip maintenance cost
+- [ ] **Tips are local accumulators**: a tip draws its node's water and sugar into itself
+      and builds when it has banked enough. Never a shared plant pool.
+- [ ] `B` fails when the node has no free face (≤5 branches per node in 3D, ≤3 in 2D)
 - [ ] `G` / `R` / `S` / `L` with positional cell fate
 - [ ] `B` fork semantics, δ roll, concurrent tips
 - [ ] `!` / `@` / `*` with `!` as loop origin and `@` consumed
@@ -78,7 +81,7 @@ asserts both numerically. No genome code anywhere yet.
 delimited two-phase program, a `*` indeterminate meristem, a `B` recursion, an `R` override
 and an `S` override) grows to reproducible, distinct morphologies from a fixed seed; the
 counted-loop identities in `MODEL.md` hold exactly (`A ! B @@@ C` → `A;BBBB;C`); and a
-deliberate `B *` proliferation genome is shown **not** to run away.
+`B *` genome is shown to cap out at the geometric branch limit rather than proliferating.
 
 ## Stage 3 — Couple growth to the economy  [ PLANNED ]
 - [ ] Two pools; root uptake, leaf photosynthesis, graph-neighbour transport
@@ -109,7 +112,10 @@ between a heavily-truncated parent tip and its seed.
 ## Stage 5 — Evolution and diversity  [ PLANNED ]
 The actual experiment: *do standard coexistence mechanisms still generate niches when
 morphology is evolved rather than parameterised?* Headless batch via `runner.mjs`.
-- [ ] Disturbance/gap regime
+- [ ] Disturbance: random mortality and patch kills as **separate** knobs, with a gap size
+      *distribution* — scattered single-cell death is not gap disturbance
+- [ ] Water-source ablation (rain only / table only / both) — the two-layer prediction is
+      that a deep-rooted and a shallow-rooted strategy coexist only in the third
 - [ ] Diversity measured as **modality, not variance** — distinct morphospace clusters
       sustained above ~1% abundance across many generations, not a snapshot
 - [ ] Ablation series: the four diversity mechanisms (graded light, heterogeneity, gaps,

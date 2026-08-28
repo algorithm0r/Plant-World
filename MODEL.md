@@ -14,8 +14,8 @@ A companion question, available cheaply because it falls out of the same code, i
 L-system rewriting system?
 
 Both 2D and 3D are wanted. Cellular (lattice) is the starting point; continuous space is of
-interest and the encoding below is designed so the same genome runs in either (see
-*Divergence angle*).
+interest, and the same alphabet runs on either — though branch *angles* are quantised on a
+lattice and continuous only off it (see *Divergence angle*).
 
 ## What kind of machine this is
 
@@ -52,14 +52,29 @@ the fix goes in the resource economy, not in the grammar. Applied throughout bel
 - 2D lattice: soil rows at the bottom, air above. (3D voxel later; see *Open*.)
 - Cell `type`: `soil`, `water_source`, `air`, `root`, `stem`, `leaf`, `seed`.
 - Soil cells carry `moisture`. Plant cells carry resource pools.
-- **Water**: diffuses from a water table/source. Consumed by root uptake, so root
-  competition is real.
+- **Water — two qualitatively different sources, and the difference is the point.**
+  - **Water table**: deep, reliable, reachable only by deep roots. Diffuses upward.
+  - **Rain**: episodic, wets the *surface*, transient. Rewards shallow spreading roots and
+    fast opportunistic uptake.
+
+  These are not two instances of one thing. Together they are **Walter's two-layer
+  mechanism** — the standard account of savanna tree/grass coexistence, where grasses
+  preempt shallow rain water and trees live off subsoil water grasses cannot reach. It
+  yields a deep-rooted and a shallow-rooted strategy that can coexist, and a clean ablation
+  (rain only / table only / both) with the prediction that coexistence appears only in the
+  third. Both are consumed by uptake, so competition is real.
 - **Light**: modelled, and **graded, not binary**. Sweep each column top-down accumulating
   transmittance: T starts at 1, each intervening leaf multiplies it by τ < 1 (stem lower).
   A leaf receives light ∝ T. Still O(width × height), one multiply instead of a flag.
   **This is not an optimisation, it is a precondition for diversity** — a binary lit/unlit
   shadow makes shade lethal, which eliminates the understory niche and therefore canopy
   stratification. See *Diversity and niches*. 3D breaks the column trick — see *Open*.
+
+  Light falls **straight down** in v1. An **angled, day-sweeping** variant is available and
+  is the version of a day/night cycle that would earn its cost: shadows sweep, so a plant
+  east of a tall neighbour catches morning light, giving *lateral* light heterogeneity
+  instead of purely vertical — a real understory niche. Still cheap (a sheared column sweep
+  rather than a vertical one). Not in v1; see *Open*.
 - **CO2**: not modelled. Global constant.
 - **Heterogeneity is required, not decorative.** A flat water table under uniform light has
   exactly one optimum and can only produce one strategy. Patchy moisture and uneven terrain
@@ -87,11 +102,10 @@ single merged pool would erase it.
      from one `B`, running identical programs, desynchronize on local conditions alone — the
      lit one runs ahead, the shaded one lags. This is the concrete numerical basis for the
      meristem differentiation that fork semantics was chosen for.
-  2. **Branching ratio becomes carbon-limited** — but through *cell* cost, not fork cost.
-     Whatever the tip count, a plant with income I can build only I/cost cells per tick, so
-     more tips means each grows slower. What limits real branching is the carbon to build
-     the branch, not the carbon to make the bud; dormant axillary buds are genuinely cheap.
-     See *Costs* for why `B` itself is free and what actually needs bounding.
+  2. **Branching is limited by local supply, on top of the geometric cap.** Whatever the tip
+     count, tips on a node compete for that node's bank, so more tips means each grows
+     slower. What limits real branching is the carbon to build the branch, not the carbon to
+     make the bud. See *Costs*.
   3. **Self-pruning and crown rise fall out.** With per-cell maintenance and local-ish sugar
      transport, shaded lower branches fail to pay their own maintenance and die. A clear bole
      under a crown is one of the most recognisable properties of a tree; getting it
@@ -105,52 +119,50 @@ single merged pool would erase it.
 ### Costs
 
 **Uniform by type.** Each cell type has one build cost, the same for every instance.
-`G` / `R` / `S` cost by the type produced; `L` costs a leaf. Control flow (`!`, `@`, `*`) is
-free. **`B` is free** — it produces no cell, only a new tip, and the branch's real cost is
-paid by whatever cells the child goes on to build. That matches the biology: dormant
-axillary buds are cheap, and carbon to build the branch is what limits branching.
+Control flow (`!`, `@`, `*`) is free. **`B` is free** — it produces no cell, only a new tip,
+and the branch's real cost is paid by whatever cells the child goes on to build. That matches
+the biology: dormant axillary buds are cheap, and the carbon to build the branch is what
+limits branching.
 
-Two things do need bounding, and neither is the fork instruction:
+**Sugar and water are not symmetric.** Sugar is the building material — cell walls are carbon
+skeletons, so sugar is consumed and locked permanently into the structure (a **stock** cost).
+Water is not built in: it drives cell expansion by turgor and is then continuously lost to
+transpiration (a **flux** requirement). So:
 
-- **Tip proliferation.** A `B` inside a loop (`B *`, or `B` before an `@` run) makes tips
-  fork repeatedly. Cell count stays bounded by the economy, but *tip* count grows
-  exponentially. Left alone that is a sim-dies problem — millions of inert tips iterated
-  every tick.
-- **The allocation exploit, which is the serious one.** If a tip's resource draw scaled with
-  the number of tips — each pulling a share of a shared plant pool — then proliferating
-  meristems would be a way to claim more of the pool without building anything, and
-  evolution would find it. This is the classic degenerate-strategy failure mode.
+- Building a cell costs **sugar**.
+- Growth additionally requires **water above a threshold**.
+- **Leaf area drains water every tick**, growing or not.
 
-Both are handled without special-casing an instruction:
+The transpiration term is load-bearing for diversity, not a detail. If water were consumed
+only when growing, drought would mean slow growth and never death, root investment would buy
+nothing but speed, light would stay the dominant axis, and the outcome would collapse back to
+a height race. With transpiration, a leafy plant in dry soil *dies*, root investment buys
+survival, and root:shoot becomes genuinely contested.
 
-1. **Tips draw from the local cell's pool, never a shared plant pool.** A thousand tips at
-   one position share that position's resources and gain nothing by existing. This kills the
-   exploit at the root, and it is also what makes shaded lower branches starve while lit ones
-   thrive — the mechanism self-pruning depends on.
-2. **A small per-tip maintenance cost.** Uniform in the same sense as cell maintenance: a
-   meristem is living tissue and costs upkeep even dormant. Max sustainable tips ≈ income /
-   tip-maintenance, so a large plant supports more meristems than a small one. This also
-   gives **apical dominance economics** for free — a tip is a lottery ticket on future growth
-   that taxes you every tick to hold, so how many dormant buds to keep becomes an evolvable
-   trade-off rather than a parameter.
+### Tips are local accumulators
 
----
+A tip sits on a node, draws that node's water and sugar into itself, and builds when it has
+banked enough. **Tips draw from the local cell's pool, never a shared plant pool.**
 
-## The genome
+Everything about branching economics follows from this without any rule enforcing it. Several
+tips on one node compete for one node's bank, so the likely outcome of heavy local branching
+is no growth or very slow growth — unless the node is an old, trunk-ish one fed by a lot of
+leaf area. Heavy branching becomes something only a well-supplied node can afford. Local
+pools are also what make shaded lower branches starve while lit ones thrive, which is the
+mechanism self-pruning depends on.
 
-A single string, read left to right by each tip. Nine symbols.
+### Branching is bounded by geometry, not economics
 
-| Symbol | Meaning |
-|---|---|
-| `G` | Grow one cell in the current direction. **Cell type is set by position:** in soil → `root`, in air → `stem`. |
-| `R` | Grow, forcing `root` type regardless of position (aerial roots). |
-| `S` | Grow, forcing `stem` type regardless of position (rhizomes, stolons, tubers). |
-| `L` | Grow a `leaf` cell, offset from the axis so it isn't buried in the stem. |
-| `B` | **Branch/fork.** Spawn a child tip at my position, heading rolled by *k·δ* (k = my branch count so far); child's read head starts at 0 of my current working copy. I continue at p+1. |
-| `F` | Produce a propagule (seed). Large lump sugar cost. |
-| `!` | Truncate this tip's working copy up to the current position. **Also sets the origin that `@` and `*` jump to.** Per-tip only. |
-| `@` | Jump the read head to origin, and **consume this `@`** (delete it from the working copy). A bounded, unary-encoded repeat. |
-| `*` | Jump the read head to origin, **not consumed**. Unbounded — an indeterminate meristem. |
+A node has 6 faces; one is where the tip arrived from. **At most 5 branches per node in 3D,
+and only 3 in 2D.** `B` fails when there is no free face — you cannot put a bud where there
+is no room. The branching factor is structurally capped before economics enters.
+
+This closes the tip-proliferation worry. A runaway genome like `B *` builds no cells, so it
+has no leaves, earns no sugar, and starves; it was never a strategy selection could favour,
+only a dead plant. **Per-tip maintenance is therefore not needed as a safety measure.** It
+remains available as a modelling choice — it would give apical-dominance economics, a bud
+being a claim on future growth that taxes you to hold — but that is a design option, not a
+safeguard, and it is **out of v1**.
 
 ### Positional cell fate (`G` vs `R`/`S`)
 
@@ -239,10 +251,20 @@ symbol.
 
 ### Divergence angle δ
 
-`B` applies a fixed pitch θ plus a roll of *k·δ*, where k is the branch index at that node
-and δ is an evolvable per-genome float. δ = 180° gives alternating 2D branching; δ ≈ 137.5°
-gives 3D phyllotaxis. **The same genome and the same alphabet run in 2D and 3D — one float
-decides which**, and δ is directly available to selection. No 3D rotation symbols are needed.
+`B` places the child on one of the node's free faces, selected by *k·δ* where k is the
+branch index at that node.
+
+**On a lattice, δ is quantised and is a face-selection rule, not an angle.** Headings take
+6 values in 3D and 4 in 2D, so branch turns are multiples of 90° and phyllotactic 137.5° is
+unreachable. δ therefore reduces to *which free face to take next*, by index. Still
+evolvable, still generates different branching patterns, but there is no golden angle and no
+continuous phyllotaxis. (An earlier version of this document claimed one float carried the
+same genome smoothly between 2D and 3D. That is only true off-lattice.)
+
+Continuous phyllotaxis is available **only** in the spatial-rather-than-cellular variant,
+where δ is a real float and geometry is rasterised onto the grid. That is now the sharpest
+reason to care about the continuous fork, and it is recorded in *Open*. No 3D rotation
+symbols are needed either way.
 
 ---
 
@@ -296,6 +318,42 @@ redesign, and is worth keeping available as an experimental condition.
 
 ---
 
+## Disturbance and temporal structure
+
+A spectrum from emergent to exogenous. They do different jobs and should be separate knobs,
+not one dial.
+
+**Emergent — free from the economy.** Starvation: a cell or tip that cannot pay maintenance
+dies. Endogenous and density-dependent, so it self-regulates.
+
+**Genomic — already in the alphabet.** A plant with `*` never finishes its tape
+(indeterminate, perennial); a plant without one runs off the end and stops (determinate,
+annual). The annual/perennial axis is therefore the presence or absence of a single symbol.
+One gap: running out of program leaves a live *static adult*, not a dead plant. True monocarpy
+— flower once then die, as in annuals, agave, bamboo — needs an explicit senescence rule tied
+to `F`. Cheap, and it completes the life-history axis.
+
+**Exogenous — and here one distinction does most of the work.**
+
+*Scattered mortality is not gap disturbance.* Random single-cell death adds noise; a pioneer
+cannot establish in a one-cell hole before being overtopped. What generates successional
+diversity is **patches large enough to grow up in**. So the parameter that matters is not the
+disturbance rate but the **gap size distribution** — and gap size is itself a niche axis, with
+large gaps favouring fast pioneers and small ones favouring shade-tolerant slow growers. Have
+both random mortality and patch kills, tuned separately.
+
+**Seasons.** Worth having, but most of the payoff arrives with Stage 6. Fluctuating conditions
+generate coexistence through the storage effect — but a plant with no sensing cannot *time*
+anything to a season, only passively endure it. The mechanism is real and mostly dormant until
+the language can read the environment.
+
+**Day/night.** Deliberately **not in v1** as intensity modulation. Pure intensity variation
+only bites if something responds nonlinearly — plants would need to starve overnight, which
+means sugar storage capacity becomes a trait. Without that it is arithmetically close to
+scaling light down, and it costs a timescale. The version that would earn its keep is the
+*angled, day-sweeping* light in *Grid and environment* — lateral rather than vertical light
+heterogeneity.
+
 ## Diversity and niches — the actual goal
 
 The hoped-for outcome is **diversity**: leafy bushes, tall trees, distinct recognisable growth
@@ -315,12 +373,15 @@ mechanisms make that possible here. All are cheap; none is optional if diversity
 
 1. **Graded light** (see *Grid and environment*). Binary shadow makes shade lethal and
    deletes the understory niche outright. Highest-leverage single decision on this list.
-2. **Spatial heterogeneity.** Patchy water and uneven terrain, so root-investing and
-   shoot-investing strategies each have somewhere they win. The two-pool economy supplies the
-   trade-off axis; heterogeneity is what lets it pay off differently in different places.
-3. **Mortality and gaps.** Disturbance opening space is the classic generator of plant
+2. **Spatial heterogeneity — and specifically two water sources.** Patchy water and uneven
+   terrain, so root-investing and shoot-investing strategies each have somewhere they win.
+   The strongest single version is **rain + water table**, which is Walter's two-layer
+   mechanism: a deep-rooted and a shallow-rooted strategy that partition the same resource by
+   depth and timing. See *Grid and environment*.
+3. **Mortality and gaps** — with **gap size**, not disturbance rate, as the parameter that
+   matters (see *Disturbance*). Disturbance opening space is the classic generator of plant
    diversity, via a colonisation-versus-competition trade-off — fast pioneers against slow
-   shade-tolerant late-successional forms. The underlying trade-off is **already latent in
+   shade-tolerant late-successional forms, sorted by gap size. The underlying trade-off is **already latent in
    the economy**: heavy leaf investment earns more sugar but costs more maintenance, so it
    wins in light and starves in shade, and sparse investment does the reverse. That is the
    leaf economics spectrum, obtained without adding a parameter.
@@ -379,11 +440,17 @@ Carried in DEVPLAN Stage 0. These are genuinely undecided, not merely unwritten.
 - **Is dead code behind `*` a reservoir or noise?** Depends on mutations accumulated while
   silenced ≈ rate × length × generations-dead. Below ~1, re-activation yields a variant of a
   recently-working program; well above, noise. Instrument it and measure rather than decide.
-- **Tip proliferation.** Cell growth is bounded by the economy, but tip count is bounded only
-  by per-tip maintenance and local-pool allocation (see *Costs*). Both are reasoned, neither
-  is demonstrated. Verify early — a hand-written `B *` genome in Stage 2 will show it.
-- **Per-tip maintenance rate.** Sets the sustainable meristem count and therefore the whole
-  apical-dominance trade-off. Needs a number.
+- **Transpiration rate per unit leaf area.** Sets how hard water bites relative to light,
+  and therefore how strong the root:shoot niche axis is. A first-order control on diversity,
+  alongside τ.
+- **Gap size distribution.** The parameter that decides whether successional diversity is
+  possible at all (see *Disturbance*). Needs a form, not just a rate.
+- **Monocarpic senescence.** Whether running out of program after `F` kills the plant, or
+  leaves a static adult. Completes the annual/perennial axis if adopted.
+- **Angled day-sweeping light.** Costed and understood, deliberately not in v1. Adopt if
+  vertical-only light proves too weak a source of lateral heterogeneity.
+- **Per-tip maintenance.** Not needed as a safeguard (geometry caps branching). Available as
+  a modelling choice for apical-dominance economics. Out of v1.
 - **Cell death and decay.** Do cells die of age as well as starvation? Does dead matter
   return to the soil? Without turnover, long runs just fill the grid.
 - **Collision.** Tip grows into an occupied cell — stall, die, or grow through? Self versus
@@ -392,7 +459,9 @@ Carried in DEVPLAN Stage 0. These are genuinely undecided, not merely unwritten.
   ever scale with depth/age/distance-from-root is open, and deliberately not v1.
 - **Disturbance regime.** Gaps are required (see *Diversity*), but the form is open: random
   cell death, patch kills, seasonality, or emergent-only from starvation.
-- **Continuous space.** The δ design keeps it open; not yet costed.
+- **Continuous space.** Now has a concrete motivation rather than a vague one: continuous
+  phyllotaxis and non-quantised branch angles are reachable *only* off-lattice (see
+  *Divergence angle*). Not yet costed.
 
 ## Prior art
 
