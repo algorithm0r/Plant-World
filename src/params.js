@@ -56,9 +56,9 @@ var PARAMETERS = {
                           // entire water niche and leaves depth nothing to pay for.
 
   // --- genome / tips (Stage 2) ---
-  genome: 'GL*',          // the demo plant: a bare juvenile axis, then `!` commits to a
-                          // leafy branching adult phase repeated by `*`. Heteroblasty from
-                          // three symbols. Try 'GL*', 'G@@@@@@', 'GGGGB*', 'GG!SSSSSSL*'.
+  genome: 'GL*',          // demo plant: leafy indeterminate axis. Viable under the
+                          // current economy. Most juvenile-phase genomes are NOT —
+                          // see the overshoot limitation in MODEL.md.
   nSeeds: 3,              // seeds sown evenly across the width
   deltaIndex: 1,          // face-selection rule for B and L. On a lattice headings are
                           // quantised, so delta picks WHICH free face to take next rather
