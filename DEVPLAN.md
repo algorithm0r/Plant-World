@@ -2,9 +2,8 @@
 *Living document, not frozen. Update as the design evolves.*
 
 `MODEL.md` is the design bible — read it first; it carries the rationale, this file carries
-the work. The model is settled enough to build (design session 2026-08-27) — Stage 0 is
-`[ DONE ]` and Stage 1 is `[ ACTIVE ]`. The open items that remain are tuning numbers and
-deferred features, none of which block code.
+the work. Stages 0-2 are `[ DONE ]`; Stages 3 and 4 are `[ ACTIVE ]` (see each stage's status
+note). The open items that remain are tuning numbers and deferred features.
 
 ## Built
 - Scaffolded from engine v2 (vanilla-JS canvas + standard DB client). Demo "drifters" model
@@ -12,8 +11,14 @@ deferred features, none of which block code.
 - The model design: purpose, machine semantics, resource economy, alphabet, reproduction,
   inheritance, mutation operators. See `MODEL.md`.
 
+- Stages 1-4 of the model (environment, genome/tips, economy, reproduction) — see each stage.
+- **Presentation (2026-11-13), not a model stage:** the browser page runs on Claude Basic 0.6.0
+  (vendored in `vendor/`), with a click-a-plant genome inspector, founder presets and a free
+  genome field, live charts and per-plant heatmaps, and a "how plants grow" panel. It changes
+  nothing in the model.
+
 ## Not yet built
-- All of it. No Plant World code exists.
+- Stage 4's clonal reproduction (observed), trait vectors in the packet, and Stages 5-7.
 
 ---
 
@@ -200,6 +205,20 @@ evolution runs with 3D as showcase/validation.
 - ~~Named genes / reuse by reference~~ — `B` is a recursive self-call and already provides
   hierarchical reuse, which was most of what genes would have bought. Revisit only if
   evolution visibly stalls on structural complexity (Stage 5).
+
+## Backlog
+- [ ] fix: browser DB saves always fail (`root is not defined` in `src/db.js` `getSocket()`, the
+      factory can't see the wrapper's `root`). Fix upstream in the standard client, then
+      `/refresh-db`; other engine-v2 sims likely share it. Until then the live page writes nothing.
+- [ ] fix: remove the `.cb-sim` grid-column override in `index.html` at the next Claude Basic
+      re-vendor if the kit caps a wide stage (finding filed for the kit 2026-11-13).
+- [ ] feat: zoom or pan on the world. Plants live in a thin band (the world is 55% sky), and on
+      a phone a cell is about one pixel.
+- [ ] feat: record each plant's parent id, so the inspector can show a lineage and the mutation
+      that made a mutant.
+- [ ] fix: DEVPLAN marks Stage 3 `[ ACTIVE ]` while its own note says the criteria are met and
+      storage is built; settle whether it closes (only nutrients + litter remain, deliberately
+      deferred).
 
 ## Prior art to read before Stage 2
 - Prusinkiewicz & Lindenmayer, *The Algorithmic Beauty of Plants*

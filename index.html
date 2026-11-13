@@ -1,41 +1,166 @@
-<!DOCTYPE html>
-<html>
+<!doctype html>
+<html lang="en">
 <head>
-  <meta charset="utf-8">
-  <title>Plant World</title>
-  <style>
-    body { margin: 0; background: #11151c; color: #cdd2da; font-family: system-ui, sans-serif; display: flex; }
-    #controlPanel { width: 240px; padding: 14px; box-sizing: border-box; }
-    #controlPanel h3 { margin: 0 0 10px; }
-    .ctl { display: block; margin: 10px 0; font-size: 13px; }
-    .ctl input { width: 100%; }
-    button { background: #2b6cf6; color: #fff; border: 0; border-radius: 6px; padding: 6px 12px; cursor: pointer; }
-    #status { font-size: 11px; color: #8a8f98; margin-top: 12px; white-space: pre-wrap; line-height: 1.5; }
-    canvas { background: #0b0e13; display: block; }
-  </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Plant World</title>
+<!-- Claude Basic, vendored and pinned (0.6.0; see DEVLOG). Never live-linked, never edited here. -->
+<link rel="stylesheet" href="vendor/claude-basic.css">
+<script src="vendor/claude-basic.js"></script>
+<style>
+  /* The world's own colours. These are PRIMITIVES in the kit's sense (like --cb-id-twitch):
+     they encode what a cell is, so a theme never moves them. Declared once, here; ui.js
+     resolves them for the canvas and the legend and charts use them as var(). The kit's
+     semantic tokens (--cb-*) style everything around the world. */
+  :root {
+    --pw-sky-dark: #0d111a;  --pw-sky-lit: #7489a6;   /* air, by how much light reaches it */
+    --pw-shade: #000000;     --pw-sun: #fffae1;       /* the light-only view */
+    --pw-soil-dry: #60442c;  --pw-soil-wet: #2f4f8f;  /* soil, by moisture */
+    --pw-air: #0b0e13;       --pw-soil: #5a442c;      --pw-water: #1e56b4;
+    --pw-root: #b98a4a;      --pw-stem: #8a6a40;      --pw-leaf: #3fbf5f;
+    --pw-seed: #e0d060;      --pw-store: #d8b8e8;
+    --pw-bank: #ffd24a;      /* a seed waiting in the bank, on the surface */
+    --pw-tip: #ff4fa3;       /* a growing tip */
+  }
+  .top { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; padding: 14px var(--cb-gap) 0; }
+  .top .spacer { flex: 1; }
+  .top h1 { margin: 0; font-size: 20px; }
+  .top .note { color: var(--cb-muted); font-size: 12px; }
+  /* The world is 4:1.5 and wide. The kit sizes the stage column to the canvas's natural
+     width (1600 px), which on a desktop screen leaves the charts a 320 px strip, so share
+     the screen out explicitly instead. */
+  @media (min-width: 1101px) { .cb-sim { grid-template-columns: minmax(0, 63fr) minmax(340px, 37fr); } }
+  #gameWorld { width: 100%; height: auto; cursor: pointer; image-rendering: pixelated; }
+
+  /* founder row and inspector */
+  .pw-row { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; }
+  .pw-row .cb-sim-ctl { flex: 1 1 220px; }
+  .pw-row #genome { font-family: var(--cb-font-mono); letter-spacing: .06em; }
+  .pw-insp-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+  .pw-insp-head .spacer { flex: 1; }
+  .pw-insp-head h2 { margin: 0; font-size: 14px; }
+  .pw-insp { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px 24px; }
+  @media (max-width: 700px) { .pw-insp { grid-template-columns: minmax(0, 1fr); } }
+  .pw-facts { display: grid; grid-template-columns: auto 1fr; gap: 3px 12px; margin: 8px 0 0; font-size: 12px; }
+  .pw-facts dt { color: var(--cb-muted); }
+  .pw-facts dd { margin: 0; color: var(--cb-text-2); font-variant-numeric: tabular-nums; }
+  .pw-gene { display: inline-flex; flex-wrap: wrap; gap: 2px; font: 600 14px var(--cb-font-mono); }
+  .pw-gene.empty { font: 12px var(--cb-font-ui); color: var(--cb-muted); }
+  .pw-sym { min-width: 1.35em; padding: 2px 0; text-align: center; border-radius: 4px; cursor: help;
+            background: var(--cb-surface-2); border: var(--cb-border-w) solid var(--cb-border); color: var(--cb-text); }
+  .pw-sym.build  { color: var(--pw-stem); }
+  .pw-sym.leaf   { color: var(--pw-leaf); }
+  .pw-sym.branch { color: var(--cb-gold); }
+  .pw-sym.seed   { color: var(--pw-bank); }
+  .pw-sym.ctl    { color: var(--cb-accent); }
+  .pw-sym.inert  { color: var(--cb-muted-2); }
+  .pw-sym.head   { outline: 2px solid var(--pw-tip); outline-offset: 0; }
+  .pw-tip { margin: 4px 0; }
+  .pw-tip .pw-gene { font-size: 12px; }
+  .pw-hint { color: var(--cb-muted); font-size: 12px; margin: 6px 0 0; }
+  .pw-key { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 10px; font-size: 11px; color: var(--cb-muted); }
+  .pw-key .pw-gene { font-size: 11px; vertical-align: middle; }
+  .pw-about p { margin: 0 0 8px; font-size: 13px; line-height: 1.5; }
+  .pw-about p:last-child { margin-bottom: 0; }
+  #moreControls { margin-top: 8px; }
+</style>
 </head>
 <body>
-  <div id="controlPanel">
-    <h3>Plant World</h3>
-    <button onclick="reset()">Reset</button>
-    <div id="status"></div>
-  </div>
-  <canvas id="gameWorld" width="800" height="600"></canvas>
+<div class="top">
+  <h1 class="cb-title">Plant World<span class="cb-dot">.</span></h1>
+  <span class="note">plants grown by programs, competing for light and water · click a plant to read its genome</span>
+  <span class="spacer"></span>
+  <span id="picker"></span>
+</div>
 
-  <!-- socket.io client (for the standard DB client in socket mode) -->
-  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
-  <!-- sim core, in dependency order; main.js last -->
-  <script src="src/util.js"></script>
-  <script src="src/params.js"></script>
-  <script src="src/db.js"></script>
-  <script src="src/engine.js"></script>
-  <script src="src/tip.js"></script>
-  <script src="src/plant.js"></script>
-  <script src="src/world.js"></script>
-  <script src="src/observer.js"></script>
-  <script src="src/charts.js"></script>
-  <script src="src/datamanager.js"></script>
-  <script src="src/ui.js"></script>
-  <script src="src/main.js"></script>
+<div class="cb-sim">
+  <div class="cb-sim-stage">
+    <div class="cb-sim-world"><canvas id="gameWorld" width="1600" height="600" aria-label="Hillside in side view with plants, soil moisture and light"></canvas></div>
+    <div class="cb-sim-bar">
+      <cb-sim-clock id="clock" count size="76" cycle-label="thousand ticks" unit-label="tick"></cb-sim-clock>
+      <cb-sim-legend><script type="application/json">[
+        {"label": "leaf", "mark": "square", "color": "var(--pw-leaf)"},
+        {"label": "stem", "mark": "square", "color": "var(--pw-stem)"},
+        {"label": "root", "mark": "square", "color": "var(--pw-root)"},
+        {"label": "storage scale", "mark": "square", "color": "var(--pw-store)"},
+        {"label": "growing tip", "mark": "square", "color": "var(--pw-tip)"},
+        {"label": "seed waiting to germinate", "mark": "square", "color": "var(--pw-bank)"},
+        {"label": "dry soil", "mark": "swatch", "color": "var(--pw-soil-dry)"},
+        {"label": "wet soil", "mark": "swatch", "color": "var(--pw-soil-wet)"},
+        {"label": "sky in shade", "mark": "swatch", "color": "var(--pw-sky-dark)"},
+        {"label": "sky in full light", "mark": "swatch", "color": "var(--pw-sky-lit)"},
+        {"label": "plant you picked", "mark": "dashed", "color": "var(--cb-accent)"}
+      ]</script></cb-sim-legend>
+    </div>
+
+    <div class="cb-card">
+      <div class="pw-insp-head">
+        <h2 id="inspTitle">Founder genome</h2>
+        <span class="spacer"></span>
+        <button class="cb-btn sm" id="tallest" type="button">Pick the tallest plant</button>
+        <button class="cb-btn sm ghost" id="clearPick" type="button">Show founder genome</button>
+      </div>
+      <div class="pw-insp">
+        <div>
+          <div class="cb-label" id="inspGermLabel">Genome the founder seeds carry</div>
+          <div id="inspGenome"></div>
+          <dl class="pw-facts" id="inspFacts"></dl>
+        </div>
+        <div id="inspTips"></div>
+      </div>
+      <div class="pw-key" id="symKey"></div>
+    </div>
+
+    <div class="cb-sim-controls pw-row">
+      <label class="cb-sim-ctl"><span class="k"><span>Founder genome</span></span>
+        <select class="cb-select" id="preset"></select></label>
+      <label class="cb-sim-ctl"><span class="k"><span>Genome to sow (G R S L B F ! @ *)</span></span>
+        <input class="cb-input" id="genome" spellcheck="false" autocomplete="off"></label>
+      <div class="btns"><button class="cb-btn primary" id="sow" type="button">Sow</button></div>
+    </div>
+    <div id="controls"></div>
+    <details class="cb-disclosure">
+      <summary>Soil water, light, growth cost and mutation settings</summary>
+      <div class="body"><div id="moreControls"></div></div>
+    </details>
+  </div>
+
+  <div class="cb-sim-charts">
+    <details class="cb-disclosure cb-card wide pw-about" open>
+      <summary>How plants grow from genomes on this hillside</summary>
+      <div class="body">
+        <p>This is a side view of a hillside, 400 cells wide. The sky is brighter where more light gets through, so the dark columns under each plant are its shade. Soil runs from brown when dry to blue when wet. Rain wets the surface every 150 ticks by default, and a water table sits below the valleys where deep roots can reach it.</p>
+        <p>Each plant grows from a genome, a short string of symbols. The genome is a program (there are no rewriting rules, as there would be in an L-system). Every growing tip (pink) reads its own copy one symbol at a time. A tip only builds when its own cell has the sugar and water to pay for the new cell. This means a program in shade or dry soil may run slowly or stall.</p>
+        <p>When a tip reads F the plant makes a seed that carries its genome with a few mutations. A seed waiting to germinate shows as a gold cell on the surface. Seeds land nearby and wait before they germinate. Plants die of starvation, at random, or some time after their program ends.</p>
+        <p>Over thousands of ticks the population is under selection. The research question is whether distinct growth forms (tall or short, deep or shallow rooted) evolve and coexist, or whether one form takes over. The heatmaps below show how plant heights, root depths and genome lengths are spread out over time. You can click a plant to read its genome, or pick or type a founder genome under the world and press Sow.</p>
+      </div>
+    </details>
+    <cb-sim-series id="pop" label="Plants alive and seeds waiting" window="400" x-label="tick" class="wide"></cb-sim-series>
+    <cb-sim-series id="turnover" label="Births and deaths, running total" window="400" x-label="tick"></cb-sim-series>
+    <cb-sim-series id="distinct" label="Distinct genomes alive" window="400" x-label="tick"></cb-sim-series>
+    <cb-sim-series id="tissue" label="Cells by tissue, all plants" window="400" x-label="tick" class="wide"></cb-sim-series>
+    <div class="cb-sim-group" style="--cols:1">
+      <div class="cb-label">Number of plants at each height, root depth and genome length, one column per 25 ticks (brighter = more plants)</div>
+      <cb-sim-histmap id="h-height" label="Height above ground, 0 to 40 cells" height="100" window="400" x-label="tick" color="var(--pw-leaf)"></cb-sim-histmap>
+      <cb-sim-histmap id="h-depth" label="Root depth, 0 to 12 cells below ground (deeper is lower)" height="100" window="400" x-label="tick" color="var(--pw-root)"></cb-sim-histmap>
+      <cb-sim-histmap id="h-genome" label="Genome length, 4 to 28 symbols" height="100" window="400" x-label="tick" color="var(--cb-accent)"></cb-sim-histmap>
+    </div>
+  </div>
+</div>
+
+<!-- socket.io client (for the standard DB client in socket mode) -->
+<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+<!-- sim core, in dependency order; main.js last -->
+<script src="src/util.js"></script>
+<script src="src/params.js"></script>
+<script src="src/db.js"></script>
+<script src="src/engine.js"></script>
+<script src="src/tip.js"></script>
+<script src="src/plant.js"></script>
+<script src="src/world.js"></script>
+<script src="src/observer.js"></script>
+<script src="src/datamanager.js"></script>
+<script src="src/ui.js"></script>
+<script src="src/main.js"></script>
 </body>
 </html>

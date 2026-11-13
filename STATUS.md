@@ -1,76 +1,57 @@
 # Plant World — STATUS
 *One screen. The current pulse. Overwritten, never appended — for history read DEVLOG.*
 
-**Updated:** 2026-08-28 — refreshed every session close; may carry unverified claims
+**Updated:** 2026-11-13 — refreshed every session close; may carry unverified claims
 **Verified:** never — no cold audit (`/audit`) has run yet; treat State as unverified
 
 ## Stage
-DEVPLAN **Stage 4 — Reproduction and inheritance**  `[ ACTIVE ]`.
-Four of five items done; **clonal reproduction is implemented but not yet observed**.
-Stage 3 closed with storage built (it did not fix the overshoot — see MODEL.md).
+DEVPLAN **Stage 4 — Reproduction and inheritance**  `[ ACTIVE ]`; **clonal reproduction is
+implemented but not yet observed**. Stage 3 is still tokened `[ ACTIVE ]` though its criteria
+are met (Backlog item to settle it). The 2026-11-13 session was presentation only: no model change.
 
 ## State
-**Stages 1-4 run, in-browser and headless — `smoketest.mjs` 33/33 PASS @ 2026-08-28.**
-Browser demo sows the founder `GL@@@@@@!GLF*`; ~15 s of watching gives 57 plants, 119 born,
-70 died, 48 seeds banked. Tick cost 0.57 ms at 141 plant cells, 1.43 ms at 1922.
-
-*Environment:* heterogeneous terrain; two water sources (table + episodic rain); field
-capacity; moisture-dependent conductivity; wilting-point uptake; graded light.
-
-*Genome:* `G R S L B F ! @ *` per tip; two tips per germination; positional cell fate.
-
-*Economy:* two per-cell pools; photosynthesis requires water; transpiration; sub-stepped
-transport; per-cell maintenance with a genome-length surcharge; storage (`L` below ground
-builds a cataphyll that loads fast and unloads slowly); local leaf senescence; structural
-support, so cut-loose tissue falls.
-
-*Reproduction:* `F` mutates the parent germline, disperses it by a local exponential kernel
-into a seed bank with dormancy, and germinates onto bare surface. Mutation is point, indel,
-`@`-run slippage and tandem duplication.
-
-**Verified emergent:** a self-sustaining population with turnover — 8 founders → 90 plants,
-476 germinations, 394 deaths, 19 distinct genomes by t=20000, genome length stable at 13.4.
-**Weismann's barrier**, which nobody coded: `!` is per-tip and somatic, so tips held `GLF*`
-and `GL!GLF*` while the seed carried the full germline `GL@@@@@@!GLF*`.
-
-**Predicted failure mode, still recorded:** built straightforwardly this model gives a
-monoculture height race. Graded light, two water sources, gap-size disturbance and local
-dispersal are structural requirements. Stage 5 ablates each.
+**Smoke 33/33 PASS @ af6d0a9-dirty (2026-11-13, pre-commit of the presentation session).**
+*Browser page (2026-11-13, seen at 1600x1000 and 375 px, basic + paper themes):* Claude Basic
+0.6.0 vendored in `vendor/`; world with legend and a 1000-tick dial; click a plant (or "Pick the
+tallest plant") to read its germline and each tip's working copy with the read head; six founder
+presets plus a free genome field; 8 front controls, 23 more behind a disclosure; a short
+"how plants grow" panel; lines for plants/seed bank, births/deaths, distinct genomes, tissue;
+heatmaps of height, root depth, genome length. Draw 0.58 ms/frame, tick 0.53 ms at ~74 plants.
+*Model:* unchanged since 2026-08-28. Default founder `GL@@@!GLBF*`, 8 seeds: 137 plants, 931
+births, 802 deaths at t=15000 (headless and browser agree). Environment: terrain, water table +
+episodic rain, field capacity, graded light. **No day/night and no seasons, by design** (MODEL.md).
+*Economy, reproduction, Weismann barrier:* as recorded 2026-08-28 (DEVLOG); not re-verified
+beyond the smoke test.
 
 ## Metrics
-- Environment @600 ticks, defaults: meanMoisture 0.297, shallow 0.367, deep 0.271,
-  surfaceLight 1.000, totalWater 2904. Field converges to net delta 8.6e-6/tick.
-- Demo genome `GGGGGG!GLB*`, 3 seeds, 200 ticks: 16471 plant cells (3361 leaf, 9377 root,
-  3733 stem), 9954 live tips, max height 55. 217 ms. Unbounded because Stage 3 is not built.
-- Per-plant records decided but not yet written: a **trait vector**, never a diversity
-  scalar. Diversity computed post hoc, measured as **modality, not variance**.
+- Smoke @600 ticks: meanMoisture 0.3742, shallow 0.3704, deep 0.3898, surfaceLight 1.000,
+  totalWater 2771.9 (2026-11-13).
+- Default run, headless, t=30000: 160 plants, 234 seeds banked, median height 6 (max 39),
+  median root depth 3 (max 11), genome length 9-17, 33 distinct genomes (2026-11-13).
+- Per-plant trait vectors are still not written to the packet. Store the vector, never a
+  diversity scalar.
 
 ## Branches
-- `main` — development
-- `live` — what GitHub Pages serves (https://algorithm0r.github.io/Plant-World/).
-  Publish with `git push origin main:live`; pushing `main` alone does NOT update the site.
+- `main` — development. The 2026-11-13 presentation commit is **local only, not pushed**.
+- `live` — what GitHub Pages serves (https://algorithm0r.github.io/Plant-World/). It still
+  shows the pre-Claude-Basic page. Publish with `git push origin main:live` (Chris approves).
 - tag `voxel-prototype-2023` — the June 2023 three.js prototype `main` was force-pushed over
 
 ## Open
-- Nothing blocking. Non-blocking: δ scope; calibrating "slower than the clock" (Stage 3);
-  τ per-leaf transmittance; cell death/decay and disturbance regime; collision rule;
-  transpiration rate; gap size distribution; monocarpic senescence; angled day-sweeping
-  light (costed, deferred; day/night intensity rejected for v1); sensing/tropisms (Stage 6); continuous space.
+- **Browser DB saves always fail** (`root is not defined`, `src/db.js` `getSocket()`); the live
+  page has never written a packet. Upstream fix in the standard client, then `/refresh-db`.
+- Kit findings for Claude Basic filed in the side-session notes (wide-stage grid, histmap has
+  no y range, ordinal clock count, world-palette pattern). One bridge: the `.cb-sim` grid
+  override in `index.html`.
+- Non-blocking model items unchanged: δ scope, τ, disturbance regime, collision rule, gap size
+  distribution, angled light (deferred), sensing (Stage 6), continuous space.
 
 ## Next action
-Close Stage 4 by getting **clonal reproduction** to actually happen, then Stage 5. Stem cells
-only die from starvation, and a starving plant rarely leaves a fragment that is both anchored
-and viable — whereas real stolon disconnection is programmed, not a starvation event.
-Candidate: make `S`-forced tissue ephemeral, since a stolon is an ephemeral connector by
-definition and `S` already exists.
+Chris reviews the page locally (http://localhost:8000/research/Plant%20World/sim/) and decides on
+publishing. Then close Stage 4 by getting **clonal reproduction** to happen (candidate: make
+`S`-forced tissue ephemeral), then Stage 5.
 
 ## Blockers
-- **Overshoot instability (blocks Stage 5).** Tips commit to cells on a local bank with no
-  reference to whole-plant carrying capacity; transport keeps cell sugar even, so an
-  overbuilt plant crosses the debt threshold everywhere at once and collapses instead of
-  shedding gracefully. Measured: peak 99 cells → final 0 at low transpiration. Water
-  throttling is currently the only thing preventing carbon overshoot, which is an accident
-  rather than a mechanism. Response to seed provisioning is **non-monotone** (`GL*`: 43 / 0 /
-  9 / 5 cells at seedSugar 2.5 / 6 / 12 / 25) and only 2 of 8 test genomes stay viable — too
-  close to noise for evolution to produce an interpretable result.
-  **Candidate fix: storage.** See MODEL.md. This is a decision, not an oversight.
+- **Overshoot instability (blocks Stage 5)**, as recorded 2026-08-28: response to seed
+  provisioning is non-monotone and few test genomes stay viable. Storage was built and did not
+  fix it. See MODEL.md.

@@ -3,7 +3,7 @@
 // cleaned: no dead AssetManager, no DOM, browser/headless split made explicit).
 //
 // An "entity" is anything with optional update(engine) and draw(ctx) methods, plus an
-// optional `removeFromWorld` flag. The world, observer, datamanager and charts are all
+// optional `removeFromWorld` flag. The world, observer, datamanager and the UI pump are all
 // entities. Browser drives the loop via start(); headless drives update() in a plain loop.
 //
 // Declared `var Foo = class Foo` so the class is a global in the browser AND attaches to

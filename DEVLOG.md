@@ -3,6 +3,40 @@ Newest entry on top. **Append only — never edit past entries.**
 
 <!-- append new entries above this line -->
 
+## 2026-11-13 — presentation: Claude Basic 0.6.0, genome inspector, first-30-seconds page
+
+**Done:** Page rebuilt for showing to two incoming grad students (TCSS 600 candidates). Claude
+Basic **0.6.0** vendored in `vendor/` (identical to Flea Jumping's copy); layout is the kit's
+`cb-sim` stage + charts. Under the world: a clock dial (one turn per 1000 ticks), a legend of
+world marks, a **plant inspector** (click a plant, or "Pick the tallest plant": its germline as
+symbol chips with hover definitions, its live facts, and each growing tip's working copy with
+the read head ringed), a founder row (six presets from the params comment plus a free genome
+field and Sow), 8 front controls and the other 23 behind a disclosure. Right column: a "how
+plants grow" panel (teaching register, stylometry + cold reader applied), lines for plants and
+seed bank, births/deaths, distinct genomes, cells by tissue, and heatmaps of height, root depth
+and genome length per plant. `charts.js` (the in-canvas LineGraph) and the text status block
+are gone.
+**Changed:** Observer draws one pixel per cell into an ImageData and scales it once (was one
+fillRect per cell); colours come from `--pw-*` primitives in `index.html`, resolved by
+`CB.sim.palette`, so no colour is written in JS. Tips drawn at cell size (were cell+2, which
+turned the canopy pink). Wet-soil colour softened. DataManager keeps view arrays beside the
+packet samples; **the packet is unchanged**. PARAM_SCHEMA got plain labels, a View select and
+`front` flags; no PARAMETERS value changed. **No model change.** Brief asked for day/night and
+seasons; the model has neither by design (MODEL.md), so none were added and the dial shows
+elapsed time only.
+**State:** smoke **33/33 PASS @ af6d0a9-dirty** (pre-commit). Model untouched, checked two
+ways: headless 15k ticks gives identical metrics with no DataManager, with it, and with
+`traits()` called on every plant every tick (137 plants, 931 births, 802 deaths), and the
+browser shows the same 137 plants at t=15000. Browser cost per frame: draw 0.58 ms, a tick
+0.53 ms at ~74 plants, so 12 ticks/frame fits 60 fps (not measured as fps: the pane was hidden
+and throttled). Seen in a real browser at 1600x1000 and 375 px (no horizontal scroll), basic and
+paper themes; click-to-inspect and preset Sow tested. **Found, not fixed:** every browser DB
+save fails (`root is not defined` in `src/db.js`), so the live page has never written a packet.
+Kit findings (wide-stage grid, histmap y range, ordinal clock count, world-palette pattern)
+filed in the side-session notes folder; one bridge in `index.html` (grid override).
+**Next:** Chris reviews before anything goes public (not pushed, not published to `live`). Then
+the db.js fix upstream, and back to Stage 4's clonal reproduction.
+
 ## 2026-08-28 — world doubled to 400 wide; transport allocation bug
 **Done:** `gridW` 200 -> 400 (1600x600 px canvas). `terrainScale` doubled 2.5 -> 5.0 alongside
 it, because it counts undulations across the WIDTH — leaving it would have stretched every

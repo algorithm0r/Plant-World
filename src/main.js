@@ -1,7 +1,7 @@
 'use strict';
 // Browser entry + wiring (not loaded headlessly). reset() rebuilds the world from the
 // current PARAMETERS; the boot sequence is straight — no AssetManager gate.
-var gameEngine, world, dataManager, db;
+var gameEngine, world, dataManager, observer, db, buffer, paused = false;
 
 function reset() {
   gameEngine.clear();
@@ -13,40 +13,36 @@ function reset() {
     const x = Math.floor((k + 0.5) * world.W / PARAMETERS.nSeeds);
     world.plantSeed(PARAMETERS.genome, x);
   }
-  const graph = new LineGraph(10, 10, 220, 80, 'live plants');
+  // one pixel per cell; the Observer scales it up in a single drawImage
+  buffer = document.createElement('canvas');
+  buffer.width = world.W; buffer.height = world.H;
   db = createDB(PARAMETERS.db);
-  dataManager = new DataManager(world, db, graph);
+  dataManager = new DataManager(world, db);
+  observer = new Observer(world, buffer, worldPalette());
   gameEngine.add(world);
-  gameEngine.add(new Observer(world));
+  gameEngine.add(observer);
   gameEngine.add(dataManager);
-  gameEngine.add(graph);
-  refreshStatus();
+  gameEngine.add(new UiPump());
+  wireCharts(dataManager);
+  inspected = null;
+  renderInspector(true);
+  gameEngine.draw();          // show the sown world even while paused
 }
 
-// The status line has to update as the run proceeds — a line written once at reset is stale
-// within seconds, and was still claiming "Stage 2, no economy yet" long after Stage 4.
-function refreshStatus() {
-  if (typeof setStatus !== 'function' || !world) return;
-  const m = world.allMetrics();
-  setStatus(
-    't=' + gameEngine.tick +
-    '  founder "' + PARAMETERS.genome + '"' +
-    '\nplants ' + m.plants + ' (' + m.alivePlants + ' alive)' +
-    '   born ' + m.births + '   died ' + m.plantDeaths + '   banked ' + m.seedBank +
-    '\ncells ' + m.plantCells + '  (leaf ' + m.leafCells + ', root ' + m.rootCells +
-    ', stem ' + m.stemCells + ', store ' + m.storeCells + ')' +
-    '\ntallest ' + m.maxHeight + '   shed ' + m.cellDeaths + '   clonal splits ' + m.clonalSplits +
-    '\nmean genome ' + m.meanGenomeLen.toFixed(1) + ' symbols' +
-    '   tips executing ' + (100 * m.execFraction).toFixed(1) + '%'
-  );
+function togglePause() {
+  paused = !paused;
+  if (paused) gameEngine.stop(); else gameEngine.start();
 }
 
 window.onload = function () {
-  const canvas = document.getElementById('gameWorld');
+  $('picker').appendChild(CB.theme.picker());
+  $('clock').setAttribute('period', CLOCK_PERIOD);
   gameEngine = new GameEngine();
-  gameEngine.init(canvas.getContext('2d'));
+  gameEngine.init($('gameWorld').getContext('2d'));
   buildControls();
+  wireInspector();
   reset();
+  // the canvas can't follow var(), so re-resolve the world's colours when the theme changes
+  document.addEventListener('cb-theme', () => { if (observer) observer.setPalette(worldPalette()); });
   gameEngine.start();
-  setInterval(refreshStatus, 400);
 };

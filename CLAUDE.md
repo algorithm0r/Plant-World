@@ -38,6 +38,10 @@ Changing any of these changes the results. If one looks wrong, raise it — don'
   `var` attaches to `globalThis` (a bare `class`/`const` would be block-scoped and never
   attach). Main-realm, not `vm`, because `vm` adds a ~7-10x hot-loop tax on per-tick global
   reads and we never need its sandbox isolation (conventions §4). Never fork the sim core.
+- **UI kit: Claude Basic 0.6.0, vendored in `vendor/`** (never live-linked, never edited; fix
+  kit bugs upstream). Page chrome uses `cb-` classes and `--cb-*` tokens. The world's own
+  colours are `--pw-*` primitives declared once in `index.html`; `ui.js` resolves them for the
+  canvas. No other raw hex.
 - **All DOM lives in `ui.js` + `index.html`.** Sim classes (`world`, `agent`, `observer`,
   `datamanager`) touch zero DOM — that's what keeps them headless-safe.
 - **Model/view split:** the world holds state and never draws; the `Observer` renders it.
@@ -57,6 +61,6 @@ The live demo is https://algorithm0r.github.io/Plant-World/ and Pages serves the
 branch. Pushing `main` does not update it. To publish: `git push origin main:live`.
 
 ## Run
-- Browser: open `index.html`.
+- Browser: http://localhost:8000/research/Plant%20World/sim/ (the always-on static server).
 - Headless batch: `node runner.mjs --reps N` (writes to MongoDB via the Server).
 - Smoke (no DB): `node smoketest.mjs` — prints the numbers that go in the DEVLOG entry.
