@@ -34,8 +34,9 @@ paper themes; click-to-inspect and preset Sow tested. **Found, not fixed:** ever
 save fails (`root is not defined` in `src/db.js`), so the live page has never written a packet.
 Kit findings (wide-stage grid, histmap y range, ordinal clock count, world-palette pattern)
 filed in the side-session notes folder; one bridge in `index.html` (grid override).
-**Next:** Chris reviews before anything goes public (not pushed, not published to `live`). Then
-the db.js fix upstream, and back to Stage 4's clonal reproduction.
+**Next:** the db.js fix upstream, and back to Stage 4's clonal reproduction.
+*(Same day: Chris approved publishing; `main` and `live` are at b683228 and the live page was
+verified running.)*
 
 ## 2026-08-28 — world doubled to 400 wide; transport allocation bug
 **Done:** `gridW` 200 -> 400 (1600x600 px canvas). `terrainScale` doubled 2.5 -> 5.0 alongside

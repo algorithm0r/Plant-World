@@ -32,9 +32,10 @@ beyond the smoke test.
   diversity scalar.
 
 ## Branches
-- `main` — development. The 2026-11-13 presentation commit is **local only, not pushed**.
+- `main` — development. Pushed through b683228 (2026-11-13, Chris approved).
 - `live` — what GitHub Pages serves (https://algorithm0r.github.io/Plant-World/). It still
-  shows the pre-Claude-Basic page. Publish with `git push origin main:live` (Chris approves).
+  serves the Claude Basic page (b683228), verified live 2026-11-13: page runs, no console
+  errors. Publish with `git push origin main:live` (Chris approves).
 - tag `voxel-prototype-2023` — the June 2023 three.js prototype `main` was force-pushed over
 
 ## Open
@@ -47,8 +48,7 @@ beyond the smoke test.
   distribution, angled light (deferred), sensing (Stage 6), continuous space.
 
 ## Next action
-Chris reviews the page locally (http://localhost:8000/research/Plant%20World/sim/) and decides on
-publishing. Then close Stage 4 by getting **clonal reproduction** to happen (candidate: make
+Fix the `src/db.js` browser-save bug upstream. Then close Stage 4 by getting **clonal reproduction** to happen (candidate: make
 `S`-forced tissue ephemeral), then Stage 5.
 
 ## Blockers
